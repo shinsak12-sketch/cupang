@@ -1,0 +1,7 @@
+size_type,size_label_ko,inbound_fee_min,shipping_fee_min,is_verified,note,effective_from,source
+XS,극소형,600,1350,FALSE,공식페이지 '600원~' 하한값. 카테고리·판매가별 실제값은 윙에서 확인 후 덮어쓸 것,2025-01-06,coupang_rg_page
+S,소형,650,1550,FALSE,공식페이지 '650원~' 하한값,2025-01-06,coupang_rg_page
+M,중형,1250,2100,FALSE,공식페이지 '1250원~' 하한값,2025-01-06,coupang_rg_page
+L1,대형1,1375,2200,FALSE,공식페이지 '1375원~' 하한값,2025-01-06,coupang_rg_page
+L2,대형2,1375,4100,FALSE,공식페이지 '1375원~' 하한값,2025-01-06,coupang_rg_page
+XL,특대형,1375,5600,FALSE,공식페이지 '1375원~' 하한값,2025-01-06,coupang_rg_page

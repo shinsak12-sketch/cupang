@@ -1,0 +1,5 @@
+promo_key,name,waives,cap_days,cap_amount,apply_start,apply_end,note,source
+rg_zerocost_new,로켓그로스 시작비용 0원 (신규),"[""inbound"",""shipping"",""storage"",""return_pickup"",""return_restock"",""removal""]",90,200000000,2026-07-01,2026-07-31,첫 판매 개시 후 90일간 입출고비·배송비 0원 + 보관비 최대 90일 무료 + 반품회수/재입고/반출비 무료. 최대 90일 또는 누적매출 2억 도달시까지. 신청기간 내 판매개시한 신규 판매자 대상,coupang_rg_page
+rg_saver,로켓그로스 세이버,"[""storage_60"",""return_pickup"",""return_restock""]",270,,,,모든 상품 보관 60일 무료 + 반품 회수비 무제한 무료 + 반품 재입고비 무제한 무료. 반출비는 매달 20개 무료 유지. 보관기간 60일 미경과 상품에 한해 60일까지 적용,coupang_rg_page
+rg_newselection,신규 상품 45일 추가 혜택,"[""storage""]",45,,2026-07-01,2026-07-31,기존 판매자 대상. 로켓배송/로켓그로스 판매이력 없는 신규상품 한정. 선착순,coupang_rg_page
+rg_ad_support,신규 판매자 광고지원금,,,210000,,,쿠팡 광고 첫 시작시 최대 21만원,coupang_rg_page

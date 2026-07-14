@@ -1,0 +1,12 @@
+fee_key,fee_name_ko,unit,amount,free_quota,free_days,is_verified,note,effective_from,source
+storage,보관비,per_day_per_unit,,,30,FALSE,매 입고시 30일 무료(프로모션 중). 의류/신발/악세서리는 45일. 일단가는 윙 확인 필요,2025-01-06,coupang_rg_page
+storage_fashion,보관비(의류/신발/악세서리),per_day_per_unit,,,45,FALSE,프로모션 중 45일 무료,2025-01-06,coupang_rg_page
+return_pickup,반품 회수비,per_item,,20,,FALSE,매달 20건 무료. 동일상품 여러개 반품돼도 1회만 부과. 단가는 윙 확인 필요,2025-01-06,coupang_rg_page
+return_restock,반품 재입고비,per_qty,,20,,FALSE,매달 20개 무료. 단가는 윙 확인 필요,2025-01-06,coupang_rg_page
+removal,반출비,per_qty,,20,,FALSE,매달 20개 무료. 2025년 개편시 건당 약 300원 언급 있었으나 현재 단가 윙 확인 필요,2025-01-06,coupang_rg_page
+service_fee,월 서비스 이용료,per_month,55000,,,TRUE,VAT포함. 월매출 100만원 초과시(가전디지털은 500만원),2019-11-25,coupang_official
+disposal,폐기비,per_qty,,,,FALSE,윙 확인 필요,2025-01-06,coupang_rg_page
+barcode_attach,바코드 부착 서비스,per_qty,,,,FALSE,부가서비스. 윙 확인 필요,2025-01-06,coupang_rg_page
+barcode_fix,바코드 오류 수정 서비스,per_qty,,,,FALSE,부가서비스. 윙 확인 필요,2025-01-06,coupang_rg_page
+removal_delivery,반출 배송 서비스,per_case,,,90,FALSE,90일 무료(최대 10만원),2025-01-06,coupang_rg_page
+shipping_fee_pg,배송비 결제수수료,rate,3.3,,,TRUE,유료배송시 배송비에 3.3%. 무료배송이면 해당없음,2019-11-25,coupang_official

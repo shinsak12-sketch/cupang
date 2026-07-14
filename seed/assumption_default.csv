@@ -1,0 +1,40 @@
+category_major,scenario,return_rate,defect_rate,sell_through_rate,target_roas,avg_storage_days,is_estimate,basis
+패션,optimistic,12.0,2.0,95.0,400,25,TRUE,업계통설 패션 반품률 15~20% 하단
+패션,base,17.0,3.0,80.0,300,45,TRUE,업계통설 패션 반품률 15~20% 중앙
+패션,pessimistic,25.0,5.0,65.0,150,75,TRUE,로켓배송 반품률 최대 20~30% 반영
+뷰티,optimistic,5.0,2.0,95.0,400,25,TRUE,추정
+뷰티,base,8.0,3.0,80.0,300,45,TRUE,추정
+뷰티,pessimistic,15.0,5.0,65.0,150,75,TRUE,추정
+생활용품,optimistic,3.0,2.0,95.0,400,25,TRUE,추정
+생활용품,base,5.0,3.0,80.0,300,45,TRUE,추정
+생활용품,pessimistic,10.0,5.0,65.0,150,75,TRUE,추정
+주방용품,optimistic,4.0,2.0,95.0,400,25,TRUE,추정
+주방용품,base,7.0,4.0,80.0,300,45,TRUE,파손 리스크 반영
+주방용품,pessimistic,13.0,7.0,65.0,150,75,TRUE,파손 리스크 반영
+가전디지털,optimistic,5.0,2.0,95.0,400,25,TRUE,추정
+가전디지털,base,9.0,4.0,80.0,300,45,TRUE,추정
+가전디지털,pessimistic,18.0,7.0,65.0,150,75,TRUE,초기불량 리스크
+완구/취미,optimistic,4.0,2.0,95.0,400,25,TRUE,추정
+완구/취미,base,7.0,4.0,80.0,300,45,TRUE,추정
+완구/취미,pessimistic,14.0,7.0,65.0,150,75,TRUE,추정
+스포츠/레저용품,optimistic,6.0,2.0,95.0,400,25,TRUE,추정
+스포츠/레저용품,base,10.0,3.0,80.0,300,45,TRUE,사이즈 이슈 반영
+스포츠/레저용품,pessimistic,18.0,5.0,65.0,150,75,TRUE,사이즈 이슈 반영
+반려/애완용품,optimistic,3.0,2.0,95.0,400,25,TRUE,추정
+반려/애완용품,base,6.0,3.0,80.0,300,45,TRUE,추정
+반려/애완용품,pessimistic,12.0,5.0,65.0,150,75,TRUE,추정
+자동차용품,optimistic,4.0,2.0,95.0,400,25,TRUE,추정
+자동차용품,base,8.0,3.0,80.0,300,45,TRUE,차종 호환 오구매 반영
+자동차용품,pessimistic,15.0,5.0,65.0,150,75,TRUE,차종 호환 오구매 반영
+문구/사무용품,optimistic,3.0,2.0,95.0,400,25,TRUE,추정
+문구/사무용품,base,5.0,3.0,80.0,300,45,TRUE,추정
+문구/사무용품,pessimistic,10.0,5.0,65.0,150,75,TRUE,추정
+가구/홈인테리어,optimistic,6.0,3.0,95.0,400,30,TRUE,추정
+가구/홈인테리어,base,11.0,5.0,80.0,300,50,TRUE,파손·부피 리스크
+가구/홈인테리어,pessimistic,20.0,8.0,65.0,150,80,TRUE,파손·부피 리스크
+출산/유아,optimistic,4.0,2.0,95.0,400,25,TRUE,추정
+출산/유아,base,7.0,3.0,80.0,300,45,TRUE,추정
+출산/유아,pessimistic,13.0,5.0,65.0,150,75,TRUE,추정
+_DEFAULT,optimistic,5.0,2.0,95.0,400,25,TRUE,카테고리 미지정시 폴백
+_DEFAULT,base,10.0,3.0,80.0,300,45,TRUE,카테고리 미지정시 폴백
+_DEFAULT,pessimistic,20.0,5.0,65.0,150,75,TRUE,카테고리 미지정시 폴백
