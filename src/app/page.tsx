@@ -13,6 +13,7 @@ type Summary = {
   sizeRules: number;
   products: number;
   estimateAssumptions: number;
+  promo: { name: string; myStartDate: string | null; daysRemaining: number | null } | null;
 };
 
 async function loadSummary(): Promise<Summary> {
@@ -31,6 +32,22 @@ async function loadSummary(): Promise<Summary> {
       .select({ n: count() })
       .from(schema.assumption)
       .where(eq(schema.assumption.isEstimate, true));
+
+    // 🔴 프로모션 D-day (my_start_date + cap_days)
+    const promoRow = await db.query.promotion.findFirst({
+      where: (t, { eq: e, and }) => and(e(t.isActive, true), e(t.promoKey, "rg_zerocost_new")),
+    });
+    let promo: Summary["promo"] = null;
+    if (promoRow) {
+      let daysRemaining: number | null = null;
+      if (promoRow.myStartDate && promoRow.capDays !== null) {
+        const start = Date.parse(promoRow.myStartDate + "T00:00:00Z");
+        const elapsed = Math.floor((Date.now() - start) / 86_400_000);
+        daysRemaining = promoRow.capDays - elapsed;
+      }
+      promo = { name: promoRow.name, myStartDate: promoRow.myStartDate, daysRemaining };
+    }
+
     return {
       ok: true,
       categories: cat.n,
@@ -39,6 +56,7 @@ async function loadSummary(): Promise<Summary> {
       sizeRules: sr.n,
       products: prod.n,
       estimateAssumptions: est.n,
+      promo,
     };
   } catch (e) {
     return {
@@ -50,6 +68,7 @@ async function loadSummary(): Promise<Summary> {
       sizeRules: 0,
       products: 0,
       estimateAssumptions: 0,
+      promo: null,
     };
   }
 }
@@ -78,6 +97,29 @@ export default async function DashboardPage() {
           <CardContent>
             <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">{s.error}</pre>
           </CardContent>
+        </Card>
+      )}
+
+      {/* 🔴 프로모션 D-day 알림 */}
+      {s.promo && (
+        <Card className="border-warn">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">{s.promo.name}</CardTitle>
+              {s.promo.daysRemaining !== null ? (
+                <Badge variant={s.promo.daysRemaining <= 14 ? "nogo" : "warn"}>
+                  D-{s.promo.daysRemaining}
+                </Badge>
+              ) : (
+                <Badge variant="warn">시작일 미입력</Badge>
+              )}
+            </div>
+            <CardDescription>
+              {s.promo.myStartDate
+                ? `내 시작일 ${s.promo.myStartDate} 기준 · 종료시 물류비 0원 혜택 소멸 (마진 절벽)`
+                : "/settings/promotions 에서 my_start_date 를 입력하면 D-day가 계산됩니다."}
+            </CardDescription>
+          </CardHeader>
         </Card>
       )}
 

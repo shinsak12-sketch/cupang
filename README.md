@@ -52,11 +52,18 @@ npm run dev             # http://localhost:3000
 
 ## 구현 현황 (Phase)
 - ✅ **Phase 1-A** — Next.js + Drizzle + Neon / 스키마 / 시딩 / Basic Auth / 수수료 CRUD + 업로드(diff 프리뷰)
-- ⬜ Phase 1-B — 계산 엔진 `/lib/calc/` + Vitest (양말 테스트케이스)
-- ⬜ Phase 1-C — SKU/로트 · URL 파싱 · 북마클릿 · 사이즈 판정기 · 착지원가 · 공통비 배분
-- ⬜ Phase 1-D — 3시나리오 판정 · 가격 시뮬레이터 · 세트 최적화 · 프로모션 전후 · BEP · 캐시플로우
-- ⬜ Phase 1-E — 비교 랭킹(ROI×회전율) · 대시보드 알림
-- ⬜ Phase 2 — 정산 파서 · 실적 입력 · variance 분석 · 가정값 자동 교정
+- ✅ **Phase 1-B** — 계산 엔진 `/lib/calc/` + Vitest 26 tests (양말 테스트케이스 XS/XS/S/S/M 통과)
+- ✅ **Phase 1-C** — SKU 등록 · URL offer_id 파싱 · 북마클릿 + `/api/ingest` · 사이즈 판정기
+- ✅ **Phase 1-D** — 3시나리오 GO/CAUTION/NO-GO · 가격 시뮬레이터 · 세트 최적화 · 프로모션 전후 · 캐시플로우
+- ✅ **Phase 1-E** — 비교 랭킹(ROI×회전율 연환산) · 대시보드 프로모션 D-day 알림
+- ⬜ Phase 2 — 정산 XLSX 파서 · 실적 입력 · variance 분석 · 가정값 자동 교정
+  (스키마 `settlement_upload/raw`, `sales_actual`, `variance` 는 미리 생성됨)
+
+### 아직 실측 필요 (모두 미검증 플래그로 표시됨)
+- `fee_size_rule` 은 빈 테이블 — 윙에서 사이즈 임계값 확인 후 입력해야 사이즈 판정기가 동작
+- `fee_logistics` 는 하한값 플레이스홀더 — 실제는 카테고리×사이즈×판매가 3중 매트릭스
+- `fee_category` 요율(2019-11-25 기준), 양말 관세율 13% 등은 `is_verified=false`
+- 착지원가는 로트(lot) 입력 또는 시뮬레이터 override 로 들어감 — 로트 CRUD UI는 후속
 
 ## 스크립트
 | 명령 | 설명 |
