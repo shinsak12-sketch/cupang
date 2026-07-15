@@ -16,7 +16,24 @@
 Next.js 15 (App Router, TS) · Neon(Postgres) · Drizzle ORM · Tailwind + shadcn/ui ·
 TanStack Query · react-hook-form + zod · Recharts · SheetJS · Vitest · Vercel
 
-## 시작하기
+## 📱 모바일 배포 (PC/CLI 없이 — 휴대폰 브라우저만)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fshinsak12-sketch%2Fcupang&env=DATABASE_URL,BASIC_AUTH_USER,BASIC_AUTH_PASS,INGEST_TOKEN&project-name=cupang&repository-name=cupang)
+
+1. **Neon DB 생성** — [neon.tech](https://neon.tech) 로그인 → 프로젝트 생성 → connection string 복사
+   (또는 Vercel 프로젝트 → Storage → Neon 연동시 `DATABASE_URL` 자동 설정)
+2. **위 Deploy 버튼** 탭 → GitHub 연결 → 환경변수 4개 입력:
+   - `DATABASE_URL` = Neon 문자열
+   - `BASIC_AUTH_USER` / `BASIC_AUTH_PASS` = 로그인용 (자유 설정)
+   - `INGEST_TOKEN` = 아무 긴 랜덤 문자열
+3. 배포 완료 후 배포 URL 접속 → Basic Auth 로그인
+4. **🔴 최초 1회만** `/settings/setup` (상단 메뉴 "셋업") → **"스키마 생성 + 시딩" 버튼 탭**
+   → 테이블 16개 생성 + 시드 데이터 주입 (CLI `db:push`/`db:seed` 없이)
+5. 대시보드에서 카테고리 125행 등 확인 → 끝
+
+> 셋업은 재실행해도 안전(idempotent). `fee_size_rule` 은 비워둠 — 윙 확인 후 입력.
+
+## 시작하기 (로컬 PC — CLI)
 
 ```bash
 npm install
@@ -27,6 +44,8 @@ npm run db:seed         # /seed 의 CSV 5종 + 양말 프로파일 주입
 
 npm run dev             # http://localhost:3000
 ```
+
+> 시드 CSV/스키마를 바꾸면 `npm run gen:embedded` 로 셋업 API용 임베드 데이터를 갱신하세요.
 
 ### 환경변수 (`.env`)
 | 키 | 설명 |

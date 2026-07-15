@@ -88,10 +88,10 @@ export default async function DashboardPage() {
       {!s.ok && (
         <Card className="border-warn">
           <CardHeader>
-            <CardTitle className="text-warn">DB 연결 필요</CardTitle>
+            <CardTitle className="text-warn">DB 연결/셋업 필요</CardTitle>
             <CardDescription>
-              <code>.env</code> 에 <code>DATABASE_URL</code> 설정 후{" "}
-              <code>npm run db:push &amp;&amp; npm run db:seed</code> 를 실행하세요.
+              모바일이면 <Link href="/settings/setup" className="font-semibold underline">셋업 페이지</Link>
+              에서 버튼 한 번으로 스키마+시딩. (CLI는 <code>npm run db:push &amp;&amp; npm run db:seed</code>)
             </CardDescription>
           </CardHeader>
           <CardContent>

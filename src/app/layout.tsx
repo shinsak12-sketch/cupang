@@ -18,6 +18,7 @@ const NAV = [
   { href: "/settings/promotions", label: "프로모션" },
   { href: "/settings/fx", label: "환율" },
   { href: "/settings/bookmarklet", label: "북마클릿" },
+  { href: "/settings/setup", label: "셋업" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
