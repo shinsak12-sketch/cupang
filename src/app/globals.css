@@ -4,49 +4,49 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 33% 97%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    /* 미검증/추정 경고 */
-    --warn: 45 93% 47%;
-    --warn-foreground: 26 83% 14%;
-    --radius: 0.5rem;
+    --card-foreground: 222 47% 11%;
+    /* 브랜드: 인디고→바이올렛 */
+    --primary: 243 75% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 93%;
+    --secondary-foreground: 222 40% 20%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 243 75% 96%;
+    --accent-foreground: 243 60% 35%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 16% 89%;
+    --input: 220 16% 88%;
+    --ring: 243 75% 58%;
+    --warn: 38 92% 50%;
+    --warn-foreground: 26 84% 16%;
+    --radius: 0.9rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 224 40% 8%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 223 39% 12%;
     --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 243 80% 68%;
+    --primary-foreground: 224 40% 8%;
+    --secondary: 222 30% 20%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --warn: 45 93% 47%;
-    --warn-foreground: 48 96% 89%;
+    --muted: 222 30% 18%;
+    --muted-foreground: 217 15% 65%;
+    --accent: 243 40% 24%;
+    --accent-foreground: 243 80% 85%;
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 25% 22%;
+    --input: 222 25% 24%;
+    --ring: 243 80% 68%;
+    --warn: 38 92% 55%;
+    --warn-foreground: 40 90% 90%;
   }
 }
 
@@ -55,6 +55,36 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background:
+      radial-gradient(1200px 600px at 100% -10%, hsl(243 75% 58% / 0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, hsl(280 75% 58% / 0.05), transparent 55%),
+      hsl(var(--background));
+    background-attachment: fixed;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 모바일에서 살짝 큰 기본 폰트 */
+  html {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  /* 볼륨감 있는 카드 그림자 */
+  .shadow-card {
+    box-shadow:
+      0 1px 2px hsl(222 47% 11% / 0.04),
+      0 4px 16px hsl(222 47% 11% / 0.06);
+  }
+  .shadow-pop {
+    box-shadow:
+      0 2px 4px hsl(222 47% 11% / 0.05),
+      0 12px 32px hsl(222 47% 11% / 0.1);
+  }
+  .dark .shadow-card {
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.3);
+  }
+  .dark .shadow-pop {
+    box-shadow: 0 10px 30px hsl(0 0% 0% / 0.45);
   }
 }
