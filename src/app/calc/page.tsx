@@ -63,7 +63,9 @@ export default function CalcPage() {
     queryKey: ["fx", "latest"],
     queryFn: async () => {
       const r = await fetch("/api/fx/latest");
-      return r.ok ? ((await r.json()) as { rate: number | null; date: string | null }) : null;
+      return r.ok
+        ? ((await r.json()) as { rate: number | null; kind: string | null; date: string | null })
+        : null;
     },
     staleTime: 3600_000,
   });
@@ -271,7 +273,9 @@ export default function CalcPage() {
                   label={
                     fxEdited || !fxData?.rate
                       ? "환율 (원/위안)"
-                      : `환율 · 자동${fxData?.date ? ` (${fxData.date})` : ""}`
+                      : `환율 · ${fxData.kind === "cash_buying" ? "현찰살때" : "기준율"}${
+                          fxData?.date ? ` (${fxData.date})` : ""
+                        }`
                   }
                 >
                   <Input
