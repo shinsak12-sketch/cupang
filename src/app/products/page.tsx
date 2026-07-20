@@ -1,23 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { CheckCircle2, Trash2, RotateCcw, PackagePlus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { won, pct } from "@/lib/utils";
 
 type Product = {
   id: number;
   name: string;
   status: string;
-  sourceOfferId: string | null;
-  setQty: number;
-  returnResalable: boolean;
-  pkgWeightG: number | null;
-  updatedAt: string;
+  sourceUrl: string | null;
+  salePrice: number | null;
+  marginAfterAd: number | null;
+  marginRate: number | null;
+  verdict: string | null;
 };
 
+const TABS = [
+  { key: "검토중", label: "후보" },
+  { key: "판매중", label: "판매중" },
+  { key: "중단", label: "폐기" },
+] as const;
+
 export default function ProductsPage() {
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<string>("검토중");
   const { data, isLoading, error } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
@@ -27,72 +38,140 @@ export default function ProductsPage() {
     },
   });
 
+  const setStatus = useMutation({
+    mutationFn: (v: { id: number; status: string }) =>
+      fetch(`/api/products/${v.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: v.status }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+  });
+
+  const all = data?.rows ?? [];
+  const counts = {
+    검토중: all.filter((p) => p.status === "검토중").length,
+    판매중: all.filter((p) => p.status === "판매중").length,
+    중단: all.filter((p) => p.status === "중단").length,
+  };
+  const rows = all.filter((p) => p.status === tab);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">SKU 목록</h1>
-          <p className="text-sm text-muted-foreground">
-            1688 URL 붙여넣기로 등록 → 사이즈 판정 · 3시나리오 GO/NO-GO 판정
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/products/new">+ SKU 등록</Link>
+        <h1 className="text-2xl font-extrabold tracking-tight">상품 목록</h1>
+        <Button asChild size="sm">
+          <Link href="/calc">
+            <PackagePlus className="h-4 w-4" /> 계산하기
+          </Link>
         </Button>
+      </div>
+
+      {/* 상태 탭 */}
+      <div className="grid grid-cols-3 gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-xl border-2 py-2.5 text-center transition-all active:scale-[0.98] ${
+              tab === t.key ? "border-primary bg-accent" : "border-border/60 bg-card"
+            }`}
+          >
+            <div className="text-2xl font-extrabold tabular-nums">
+              {counts[t.key as keyof typeof counts]}
+            </div>
+            <div className="text-xs text-muted-foreground">{t.label}</div>
+          </button>
+        ))}
       </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
       {error && <p className="text-sm text-destructive">DB 연결 필요: {String(error)}</p>}
 
-      {data && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>이름</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead>offer_id</TableHead>
-              <TableHead className="text-right">세트</TableHead>
-              <TableHead>반품재판매</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                  등록된 SKU가 없습니다. 시딩하면 &quot;양말 (데모 프로파일)&quot;이 있습니다.
-                </TableCell>
-              </TableRow>
+      {data && rows.length === 0 && (
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            {tab === "검토중" ? (
+              <>
+                후보가 없어요.{" "}
+                <Link href="/calc" className="font-semibold text-primary underline">
+                  마진 계산
+                </Link>
+                해서 저장해보세요.
+              </>
+            ) : (
+              "해당 상태의 상품이 없습니다."
             )}
-            {data.rows.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/products/${p.id}`} className="hover:underline">
-                    {p.name}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{p.status}</Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{p.sourceOfferId ?? "-"}</TableCell>
-                <TableCell className="text-right">{p.setQty}족</TableCell>
-                <TableCell>
-                  {p.returnResalable ? (
-                    <Badge variant="outline">가능</Badge>
-                  ) : (
-                    <Badge variant="nogo">원가전손</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/products/${p.id}`}>분석 →</Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          </CardContent>
+        </Card>
       )}
+
+      <div className="space-y-3">
+        {rows.map((p) => (
+          <Card key={p.id}>
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{p.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    판매가 {won(p.salePrice)} · 마진{" "}
+                    <span className={p.marginAfterAd !== null && p.marginAfterAd < 0 ? "text-red-600" : "text-foreground"}>
+                      {won(p.marginAfterAd)} ({pct(p.marginRate)})
+                    </span>
+                  </p>
+                </div>
+                {p.verdict && (
+                  <Badge variant={p.verdict === "양호" ? "go" : p.verdict === "주의" ? "caution" : "nogo"}>
+                    {p.verdict}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                {p.status === "검토중" && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setStatus.mutate({ id: p.id, status: "판매중" })}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> 판매등록
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setStatus.mutate({ id: p.id, status: "중단" })}
+                    >
+                      <Trash2 className="h-4 w-4" /> 폐기
+                    </Button>
+                  </>
+                )}
+                {p.status === "판매중" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setStatus.mutate({ id: p.id, status: "중단" })}
+                  >
+                    <Trash2 className="h-4 w-4" /> 판매 중단
+                  </Button>
+                )}
+                {p.status === "중단" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setStatus.mutate({ id: p.id, status: "검토중" })}
+                  >
+                    <RotateCcw className="h-4 w-4" /> 후보로 복원
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

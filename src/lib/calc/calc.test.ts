@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  calcSimpleMargin,
   resolveSize,
   allocateCommonCost,
   calcLandedCost,
@@ -29,6 +30,40 @@ const SIZE_RULES: SizeRule[] = [
   { sizeType: "L2", maxDimensionSumMm: 2000, maxWeightG: 20000, volumetricDivisor: 6000, sortOrder: 4 },
   { sizeType: "XL", maxDimensionSumMm: 2500, maxWeightG: 30000, volumetricDivisor: 6000, sortOrder: 5 },
 ];
+
+describe("calcSimpleMargin — 엑셀 소싱리스트 로직", () => {
+  it("마진 = 판매가/1.1 − 착지원가/1.1 − 입출고비 − 판매수수료", () => {
+    const r = calcSimpleMargin({
+      salePrice: 20000,
+      landedCost: 5000,
+      inboundShipFee: 1950,
+      commissionPct: 10.8,
+    });
+    // 20000/1.1 − 5000/1.1 − 1950 − 20000*0.108 = 9526
+    expect(r.margin).toBe(9526);
+    expect(r.marginRate).toBeCloseTo(47.6, 1);
+    // 최소 ROAS = 1.1 / 0.476 ≈ 2.31
+    expect(r.breakevenRoas).toBeCloseTo(2.31, 1);
+    expect(r.verdict).toBe("양호");
+  });
+
+  it("적자면 위험 판정", () => {
+    const r = calcSimpleMargin({
+      salePrice: 8000,
+      landedCost: 6000,
+      inboundShipFee: 1950,
+      commissionPct: 10.8,
+    });
+    expect(r.margin).toBeLessThan(0);
+    expect(r.verdict).toBe("위험");
+  });
+
+  it("광고비 반영 마진", () => {
+    const base = calcSimpleMargin({ salePrice: 20000, landedCost: 5000, inboundShipFee: 1950, commissionPct: 10.8 });
+    const withAd = calcSimpleMargin({ salePrice: 20000, landedCost: 5000, inboundShipFee: 1950, commissionPct: 10.8, adCost: 2000 });
+    expect(withAd.marginAfterAd).toBe(base.margin - 2000);
+  });
+});
 
 describe("resolveSize — 양말 테스트케이스", () => {
   const cases = [

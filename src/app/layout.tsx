@@ -4,8 +4,8 @@ import { Providers } from "./providers";
 import { TopBar, BottomNav } from "@/components/app-nav";
 
 export const metadata: Metadata = {
-  title: "cupang — 로켓그로스 수익계산기",
-  description: "1688 사입 → 쿠팡 로켓그로스 판매 개인 셀러용 수익 계산·관리",
+  title: "마진계산기 — 쿠팡 로켓그로스",
+  description: "사입 원가부터 입력해 이 상품 팔면 얼마 남는지 계산·관리",
 };
 
 export const viewport: Viewport = {

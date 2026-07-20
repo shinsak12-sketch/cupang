@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Package, BarChart3, Wallet, LayoutGrid } from "lucide-react";
+import { Home, Calculator, Package, BarChart3, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY = [
   { href: "/", label: "홈", icon: Home },
-  { href: "/products", label: "SKU", icon: Package },
+  { href: "/calc", label: "계산", icon: Calculator },
+  { href: "/products", label: "목록", icon: Package },
   { href: "/compare", label: "비교", icon: BarChart3 },
-  { href: "/cashflow", label: "현금", icon: Wallet },
   { href: "/more", label: "더보기", icon: LayoutGrid },
 ];
 
@@ -26,9 +26,9 @@ export function TopBar() {
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
         <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground shadow-pop">
-            🚀
+            🧮
           </span>
-          cupang
+          마진계산기
         </Link>
         {/* 데스크톱 전용 가로 내비 */}
         <nav className="hidden gap-1 md:flex">

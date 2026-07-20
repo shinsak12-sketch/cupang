@@ -7,10 +7,28 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const rows = await db
+  const products = await db
     .select()
     .from(schema.product)
     .orderBy(desc(schema.product.updatedAt));
+
+  // 각 상품의 최신 활성 price_plan 에서 마진 스냅샷 첨부
+  const rows = await Promise.all(
+    products.map(async (p) => {
+      const plan = await db.query.pricePlan.findFirst({
+        where: (t, { eq: e, and }) => and(e(t.productId, p.id), e(t.isActive, true)),
+        orderBy: (t, { desc: d }) => [d(t.createdAt)],
+      });
+      const snap = (plan?.calcSnapshot ?? null) as { result?: { marginRate?: number; marginAfterAd?: number; verdict?: string } } | null;
+      return {
+        ...p,
+        salePrice: plan?.finalPrice ? Number(plan.finalPrice) : null,
+        marginRate: snap?.result?.marginRate ?? null,
+        marginAfterAd: snap?.result?.marginAfterAd ?? null,
+        verdict: snap?.result?.verdict ?? null,
+      };
+    })
+  );
   return NextResponse.json({ rows });
 }
 
