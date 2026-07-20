@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2, Save, Package, Percent, Megaphone } from "lucide-react";
@@ -55,7 +55,21 @@ export default function CalcPage() {
   const [costCny, setCostCny] = useState("");
   const [cnInland, setCnInland] = useState("");
   const [fx, setFx] = useState("190");
+  const [fxEdited, setFxEdited] = useState(false);
   const [surcharge, setSurcharge] = useState("80");
+
+  // 환율 자동 (CNY→KRW). 사용자가 직접 고치기 전까지만 자동 반영.
+  const { data: fxData } = useQuery({
+    queryKey: ["fx", "latest"],
+    queryFn: async () => {
+      const r = await fetch("/api/fx/latest");
+      return r.ok ? ((await r.json()) as { rate: number | null; date: string | null }) : null;
+    },
+    staleTime: 3600_000,
+  });
+  useEffect(() => {
+    if (fxData?.rate && !fxEdited) setFx(String(fxData.rate));
+  }, [fxData, fxEdited]);
   // 국내
   const [costKrw, setCostKrw] = useState("");
   const [domShip, setDomShip] = useState("");
@@ -253,8 +267,21 @@ export default function CalcPage() {
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="환율 (원/위안)">
-                  <Input value={fx} onChange={(e) => setFx(e.target.value)} inputMode="decimal" />
+                <Field
+                  label={
+                    fxEdited || !fxData?.rate
+                      ? "환율 (원/위안)"
+                      : `환율 · 자동${fxData?.date ? ` (${fxData.date})` : ""}`
+                  }
+                >
+                  <Input
+                    value={fx}
+                    onChange={(e) => {
+                      setFx(e.target.value);
+                      setFxEdited(true);
+                    }}
+                    inputMode="decimal"
+                  />
                 </Field>
                 <Field label="대행 가산 (원/위안)">
                   <Input value={surcharge} onChange={(e) => setSurcharge(e.target.value)} inputMode="decimal" />
