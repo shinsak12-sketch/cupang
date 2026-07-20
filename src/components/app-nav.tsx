@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calculator, Package, BarChart3, LayoutGrid } from "lucide-react";
+import { Home, Calculator, Package, ClipboardList, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY = [
   { href: "/", label: "홈", icon: Home },
   { href: "/calc", label: "계산", icon: Calculator },
   { href: "/products", label: "목록", icon: Package },
-  { href: "/compare", label: "비교", icon: BarChart3 },
+  { href: "/manage", label: "관리", icon: ClipboardList },
   { href: "/more", label: "더보기", icon: LayoutGrid },
 ];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  if (href === "/more") return pathname.startsWith("/settings") || pathname === "/more";
+  if (href === "/more") return pathname.startsWith("/settings") || pathname === "/more" || pathname === "/compare" || pathname === "/cashflow";
   return pathname === href || pathname.startsWith(href + "/");
 }
 

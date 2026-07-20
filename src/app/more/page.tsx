@@ -7,11 +7,13 @@ import {
   Bookmark,
   DatabaseZap,
   Wallet,
+  BarChart3,
   ChevronRight,
 } from "lucide-react";
 
 const ITEMS = [
   { href: "/settings/setup", icon: DatabaseZap, title: "DB 셋업", desc: "최초 1회 · 스키마 생성 + 시딩", accent: true },
+  { href: "/compare", icon: BarChart3, title: "비교 분석", desc: "저장 상품 마진 순 랭킹" },
   { href: "/cashflow", icon: Wallet, title: "캐시플로우", desc: "결제→정산 현금 묶임·회수일" },
   { href: "/settings/fees", icon: Percent, title: "수수료 테이블", desc: "카테고리 요율 · 물류비 · 업로드(diff)" },
   { href: "/settings/assumptions", icon: SlidersHorizontal, title: "가정값", desc: "반품률·ROAS·보관일 (추정치)" },
