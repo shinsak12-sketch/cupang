@@ -50,11 +50,17 @@ export default function CalcPage() {
   const [middle, setMiddle] = useState("");
 
   // 사입
-  const [cost, setCost] = useState("");
   const [sourcing, setSourcing] = useState<"overseas" | "domestic">("overseas");
-  const [agentRate, setAgentRate] = useState("5");
-  const [intlShip, setIntlShip] = useState("");
-  const [domesticShip, setDomesticShip] = useState("");
+  // 해외 (중국): (원가위안 + 내륙운송비위안) × (환율 + 가산)
+  const [costCny, setCostCny] = useState("");
+  const [cnInland, setCnInland] = useState("");
+  const [fx, setFx] = useState("190");
+  const [surcharge, setSurcharge] = useState("80");
+  // 국내
+  const [costKrw, setCostKrw] = useState("");
+  const [domShip, setDomShip] = useState("");
+  const [shipMode, setShipMode] = useState<"per" | "once">("per");
+  const [qty, setQty] = useState("1");
   const [others, setOthers] = useState<{ label: string; amount: string }[]>([]);
 
   // 판매
@@ -101,11 +107,14 @@ export default function CalcPage() {
   }
 
   // 착지원가
-  const agentFee = sourcing === "overseas" ? Math.round((n(cost) * n(agentRate)) / 100) : 0;
-  const sourcingCost =
-    sourcing === "overseas" ? agentFee + n(intlShip) : n(domesticShip);
+  const effRate = n(fx) + n(surcharge); // 환율 + 가산(대행 내재)
+  const overseasSourcing = Math.round((n(costCny) + n(cnInland)) * effRate);
+  const domShipPerUnit =
+    shipMode === "per" ? n(domShip) : n(qty) > 0 ? Math.round(n(domShip) / n(qty)) : 0;
+  const domesticSourcing = n(costKrw) + domShipPerUnit;
+  const sourcingCost = sourcing === "overseas" ? overseasSourcing : domesticSourcing;
   const othersSum = others.reduce((s, o) => s + n(o.amount), 0);
-  const landedCost = n(cost) + sourcingCost + othersSum;
+  const landedCost = sourcingCost + othersSum;
 
   const result = useMemo(
     () =>
@@ -129,13 +138,20 @@ export default function CalcPage() {
     try {
       const snapshot = {
         inputs: {
-          cost: n(cost),
           sourcing,
-          agentRate: n(agentRate),
-          agentFee,
-          intlShip: n(intlShip),
-          domesticShip: n(domesticShip),
+          // 해외
+          costCny: n(costCny),
+          cnInland: n(cnInland),
+          fx: n(fx),
+          surcharge: n(surcharge),
+          // 국내
+          costKrw: n(costKrw),
+          domShip: n(domShip),
+          shipMode,
+          qty: n(qty),
+          // 공통
           others,
+          landedCost,
           salePrice: n(salePrice),
           commission: n(commission),
           sizeType,
@@ -215,14 +231,10 @@ export default function CalcPage() {
           <CardTitle className="text-base">① 사입 원가 (들여오는 비용)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Field label="원가 (제품 가격)">
-            <Input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="numeric" placeholder="0" />
-          </Field>
-
           <Field label="사입 방식">
             <div className="grid grid-cols-2 gap-2">
               <Toggle active={sourcing === "overseas"} onClick={() => setSourcing("overseas")}>
-                해외 (1688 등)
+                해외 (중국)
               </Toggle>
               <Toggle active={sourcing === "domestic"} onClick={() => setSourcing("domestic")}>
                 국내 도매
@@ -231,18 +243,57 @@ export default function CalcPage() {
           </Field>
 
           {sourcing === "overseas" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="대행수수료율 %">
-                <Input value={agentRate} onChange={(e) => setAgentRate(e.target.value)} inputMode="decimal" />
-              </Field>
-              <Field label={`수입대행비 (자동 ${won(agentFee)})`}>
-                <Input value={intlShip} onChange={(e) => setIntlShip(e.target.value)} inputMode="numeric" placeholder="국제배송비(선택)" />
-              </Field>
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="원가 (위안 ¥)">
+                  <Input value={costCny} onChange={(e) => setCostCny(e.target.value)} inputMode="decimal" placeholder="0" />
+                </Field>
+                <Field label="내륙운송비 (위안 ¥)">
+                  <Input value={cnInland} onChange={(e) => setCnInland(e.target.value)} inputMode="decimal" placeholder="0" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="환율 (원/위안)">
+                  <Input value={fx} onChange={(e) => setFx(e.target.value)} inputMode="decimal" />
+                </Field>
+                <Field label="대행 가산 (원/위안)">
+                  <Input value={surcharge} onChange={(e) => setSurcharge(e.target.value)} inputMode="decimal" />
+                </Field>
+              </div>
+              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                수입대행비 = (원가 {n(costCny) || 0}¥ + 내륙 {n(cnInland) || 0}¥) × (환율 {n(fx) || 0} + {n(surcharge) || 0}) ={" "}
+                <b className="text-foreground">{won(overseasSourcing)}</b>
+              </p>
+            </>
           ) : (
-            <Field label="국내 배송비 (직접입력)">
-              <Input value={domesticShip} onChange={(e) => setDomesticShip(e.target.value)} inputMode="numeric" placeholder="0" />
-            </Field>
+            <>
+              <Field label="원가 (원)">
+                <Input value={costKrw} onChange={(e) => setCostKrw(e.target.value)} inputMode="numeric" placeholder="0" />
+              </Field>
+              <Field label="국내 배송비 (원)">
+                <div className="space-y-2">
+                  <Input value={domShip} onChange={(e) => setDomShip(e.target.value)} inputMode="numeric" placeholder="0" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Toggle active={shipMode === "per"} onClick={() => setShipMode("per")}>
+                      개당
+                    </Toggle>
+                    <Toggle active={shipMode === "once"} onClick={() => setShipMode("once")}>
+                      1회 (수량 분배)
+                    </Toggle>
+                  </div>
+                </div>
+              </Field>
+              {shipMode === "once" && (
+                <Field label="주문 수량 (배송비 나눌 개수)">
+                  <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" placeholder="1" />
+                </Field>
+              )}
+              {shipMode === "once" && n(domShip) > 0 && (
+                <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  개당 배송비 = {won(n(domShip))} ÷ {n(qty) || 1}개 = <b className="text-foreground">{won(domShipPerUnit)}</b>
+                </p>
+              )}
+            </>
           )}
 
           {/* 기타비용 */}
