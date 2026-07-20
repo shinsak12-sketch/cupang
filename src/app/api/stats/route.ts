@@ -17,8 +17,13 @@ export async function GET() {
     db.query.promotion.findFirst({
       where: (t, { eq: e, and }) => and(e(t.isActive, true), e(t.promoKey, "rg_zerocost_new")),
     }),
-    db.select().from(schema.pricePlan).where(eq(schema.pricePlan.isActive, true)),
-    db.select().from(schema.salesActual),
+    db
+      .select({ productId: schema.pricePlan.productId, calcSnapshot: schema.pricePlan.calcSnapshot })
+      .from(schema.pricePlan)
+      .where(eq(schema.pricePlan.isActive, true)),
+    db
+      .select({ productId: schema.salesActual.productId, ym: schema.salesActual.ym, soldQty: schema.salesActual.soldQty })
+      .from(schema.salesActual),
   ]);
 
   const statusCount = (s: string) => statusRows.find((r) => r.status === s)?.n ?? 0;
