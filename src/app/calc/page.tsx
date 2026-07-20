@@ -131,6 +131,9 @@ export default function CalcPage() {
   const sourcingCost = sourcing === "overseas" ? overseasSourcing : domesticSourcing;
   const othersSum = others.reduce((s, o) => s + n(o.amount), 0);
   const landedCost = sourcingCost + othersSum;
+  // 최초원가(원가만, 원 환산) — 위안 입력시 헷갈리지 않게 착지원가 옆에 함께 표시
+  const baseCostKrw =
+    sourcing === "overseas" ? Math.round(n(costCny) * effRate) : n(costKrw);
 
   const result = useMemo(
     () =>
@@ -291,10 +294,15 @@ export default function CalcPage() {
                   <Input value={surcharge} onChange={(e) => setSurcharge(e.target.value)} inputMode="decimal" />
                 </Field>
               </div>
-              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                수입대행비 = (원가 {n(costCny) || 0}¥ + 내륙 {n(cnInland) || 0}¥) × (환율 {n(fx) || 0} + {n(surcharge) || 0}) ={" "}
-                <b className="text-foreground">{won(overseasSourcing)}</b>
-              </p>
+              <div className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+                <BreakRow label="원가" value={`${n(costCny) || 0}¥`} />
+                <BreakRow label="내륙운송비" value={`${n(cnInland) || 0}¥`} />
+                <BreakRow label={`적용환율 (${n(fx) || 0}+${n(surcharge) || 0})`} value={`${effRate}원`} />
+                <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1.5 font-bold">
+                  <span>수입대행비</span>
+                  <span className="tabular-nums">{won(overseasSourcing)}</span>
+                </div>
+              </div>
             </>
           ) : (
             <>
@@ -320,9 +328,12 @@ export default function CalcPage() {
                 </Field>
               )}
               {shipMode === "once" && n(domShip) > 0 && (
-                <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                  개당 배송비 = {won(n(domShip))} ÷ {n(qty) || 1}개 = <b className="text-foreground">{won(domShipPerUnit)}</b>
-                </p>
+                <div className="flex items-center justify-between rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+                  <span className="text-muted-foreground">
+                    개당 배송비 · {won(n(domShip))} ÷ {n(qty) || 1}개
+                  </span>
+                  <span className="font-bold tabular-nums">{won(domShipPerUnit)}</span>
+                </div>
               )}
             </>
           )}
@@ -357,9 +368,17 @@ export default function CalcPage() {
             ))}
           </div>
 
-          <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
-            <span className="text-sm font-medium">= 착지원가 (개당)</span>
-            <span className="text-lg font-extrabold tabular-nums">{won(landedCost)}</span>
+          <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{sourcing === "overseas" ? "최초원가 (위안→원)" : "최초원가"}</span>
+              <span className="tabular-nums">
+                {sourcing === "overseas" ? `${n(costCny) || 0}¥ ≈ ${won(baseCostKrw)}` : won(baseCostKrw)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">= 착지원가 (개당)</span>
+              <span className="text-xl font-extrabold tabular-nums">{won(landedCost)}</span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -421,15 +440,18 @@ export default function CalcPage() {
             <Line label="판매수수료" value={won(result.commission)} />
             <Line label="입출고비" value={won(result.inboundShipFee)} />
             <Line label="납부부가세" value={won(result.vatPayable)} />
-            {n(adCost) > 0 && <Line label="광고 전 마진" value={won(result.margin)} />}
+            {n(adCost) > 0 && <Line label="광고전마진" value={won(result.margin)} />}
+            {n(adCost) > 0 && <Line label="광고비" value={won(n(adCost))} />}
             <Line
-              label="손익분기 ROAS"
+              label="손익 ROAS"
               value={result.breakevenRoas > 0 ? `${result.breakevenRoas}배` : "-"}
             />
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
-            <Megaphone className="h-4 w-4 shrink-0" />
-            광고 ROAS가 <b>{result.breakevenRoas || "-"}배</b> 이상이어야 광고 붙여도 남습니다.
+          <div className="flex items-start gap-2 rounded-lg bg-accent px-3 py-2 text-xs leading-relaxed text-accent-foreground">
+            <Megaphone className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              광고하려면 <b className="whitespace-nowrap">ROAS {result.breakevenRoas || "-"}배</b> 넘어야 남아요.
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -486,9 +508,18 @@ function Toggle({
 
 function Line({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between gap-1 whitespace-nowrap">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function BreakRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-0.5 text-muted-foreground">
+      <span>{label}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   );
 }
