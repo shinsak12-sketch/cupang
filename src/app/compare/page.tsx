@@ -3,136 +3,121 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Trophy, ChevronRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { won, pct } from "@/lib/utils";
 
-type Row = {
+type Product = {
   id: number;
   name: string;
-  sizeType: string | null;
-  price: number;
-  priceSource: string;
-  marginRate: number;
-  netProfit: number;
-  roi: number;
-  breakevenQty: number;
-  verdict: "GO" | "CAUTION" | "NO-GO";
-  recoveryDays: number | null;
-  annualizedRoi: number | null;
+  status: string;
+  salePrice: number | null;
+  marginAfterAd: number | null;
+  marginRate: number | null;
+  verdict: string | null;
 };
 
-type SortKey = "annualizedRoi" | "marginRate" | "netProfit" | "roi" | "recoveryDays" | "breakevenQty";
-
+type SortKey = "marginAfterAd" | "marginRate";
 const SORTS: { key: SortKey; label: string }[] = [
-  { key: "annualizedRoi", label: "연환산 ROI (기본)" },
-  { key: "roi", label: "ROI" },
+  { key: "marginAfterAd", label: "개당 마진" },
   { key: "marginRate", label: "마진율" },
-  { key: "netProfit", label: "개당이익" },
-  { key: "recoveryDays", label: "현금회수일" },
-  { key: "breakevenQty", label: "BEP수량" },
 ];
 
 export default function ComparePage() {
-  const [sort, setSort] = useState<SortKey>("annualizedRoi");
+  const [sort, setSort] = useState<SortKey>("marginAfterAd");
   const { data, isLoading, error } = useQuery({
-    queryKey: ["compare"],
+    queryKey: ["products"],
     queryFn: async () => {
-      const r = await fetch("/api/compare");
+      const r = await fetch("/api/products");
       if (!r.ok) throw new Error(await r.text());
-      return r.json() as Promise<{ rows: Row[] }>;
+      return r.json() as Promise<{ rows: Product[] }>;
     },
   });
 
-  const rows = [...(data?.rows ?? [])].sort((a, b) => {
-    const av = a[sort];
-    const bv = b[sort];
-    const an = av === null ? (sort === "recoveryDays" || sort === "breakevenQty" ? Infinity : -Infinity) : av;
-    const bn = bv === null ? (sort === "recoveryDays" || sort === "breakevenQty" ? Infinity : -Infinity) : bv;
-    // recoveryDays/BEP는 작을수록 좋음(오름차순), 나머지는 클수록 좋음(내림차순)
-    return sort === "recoveryDays" || sort === "breakevenQty" ? an - bn : bn - an;
-  });
+  const rows = (data?.rows ?? [])
+    .filter((p) => p.status !== "중단" && p.marginAfterAd !== null)
+    .sort((a, b) => (b[sort] ?? -Infinity) - (a[sort] ?? -Infinity));
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">SKU 비교 랭킹</h1>
-        <p className="text-sm text-muted-foreground">
-          🔴 <b>ROI × 회전율 = 연환산 자본수익률</b>이 진짜 순위. 종료 후(프로모션 off) 경제성 기준.
-          회전율은 로트 캐시플로우가 있어야 계산됩니다.
-        </p>
+        <h1 className="text-2xl font-extrabold tracking-tight">비교 분석</h1>
+        <p className="text-sm text-muted-foreground">저장한 상품을 마진 순으로 줄 세웁니다 (폐기 제외).</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {SORTS.map((s) => (
           <button
             key={s.key}
             onClick={() => setSort(s.key)}
-            className={`rounded-md border px-3 py-1 text-sm ${
-              sort === s.key ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+            className={`rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-[0.98] ${
+              sort === s.key ? "border-primary bg-primary text-primary-foreground" : "border-border/60 bg-card"
             }`}
           >
-            {s.label}
+            {s.label} 순
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">계산 중…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
       {error && <p className="text-sm text-destructive">DB 연결 필요: {String(error)}</p>}
 
-      {data && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>SKU</TableHead>
-              <TableHead>판정</TableHead>
-              <TableHead>사이즈</TableHead>
-              <TableHead className="text-right">기준가</TableHead>
-              <TableHead className="text-right">마진율</TableHead>
-              <TableHead className="text-right">개당이익</TableHead>
-              <TableHead className="text-right">ROI</TableHead>
-              <TableHead className="text-right">회수일</TableHead>
-              <TableHead className="text-right">연환산ROI</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/products/${r.id}`} className="hover:underline">
-                    {r.name}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={r.verdict === "GO" ? "go" : r.verdict === "CAUTION" ? "caution" : "nogo"}>
-                    {r.verdict}
-                  </Badge>
-                </TableCell>
-                <TableCell>{r.sizeType ?? "-"}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {won(r.price)}
-                  {r.priceSource === "default" && (
-                    <span className="ml-1 text-xs text-warn">(기본)</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{pct(r.marginRate)}</TableCell>
-                <TableCell className="text-right tabular-nums">{won(r.netProfit)}</TableCell>
-                <TableCell className="text-right tabular-nums">{pct(r.roi)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {r.recoveryDays === null ? "—" : `D+${r.recoveryDays}`}
-                </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">
-                  {r.annualizedRoi === null ? (
-                    <span className="text-xs text-muted-foreground">로트 필요</span>
-                  ) : (
-                    pct(r.annualizedRoi)
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      {data && rows.length === 0 && (
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            비교할 상품이 없어요.{" "}
+            <Link href="/calc" className="font-semibold text-primary underline">
+              마진 계산
+            </Link>{" "}
+            후 저장해보세요.
+          </CardContent>
+        </Card>
       )}
+
+      <div className="space-y-2.5">
+        {rows.map((p, i) => (
+          <Link key={p.id} href={`/products/${p.id}`}>
+            <Card className="transition-all active:scale-[0.99]">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-extrabold ${
+                    i === 0
+                      ? "bg-amber-400 text-amber-950"
+                      : i === 1
+                        ? "bg-slate-300 text-slate-800"
+                        : i === 2
+                          ? "bg-orange-300 text-orange-950"
+                          : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {i < 3 ? <Trophy className="h-4 w-4" /> : i + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{p.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    판매가 {won(p.salePrice)} · {pct(p.marginRate)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`font-extrabold tabular-nums ${p.marginAfterAd! < 0 ? "text-red-600" : ""}`}>
+                    {won(p.marginAfterAd)}
+                  </p>
+                  {p.verdict && (
+                    <Badge
+                      variant={p.verdict === "양호" ? "go" : p.verdict === "주의" ? "caution" : "nogo"}
+                      className="mt-0.5"
+                    >
+                      {p.verdict}
+                    </Badge>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

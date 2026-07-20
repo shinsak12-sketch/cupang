@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export const runtime = "nodejs";
@@ -16,7 +16,23 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const category = product.categoryId
     ? await db.query.feeCategory.findFirst({ where: (t, { eq: e }) => e(t.id, product.categoryId!) })
     : null;
-  const lots = await db.select().from(schema.lot).where(eq(schema.lot.productId, pid));
 
-  return NextResponse.json({ product, category, lots });
+  const plan = await db.query.pricePlan.findFirst({
+    where: (t, { eq: e, and }) => and(e(t.productId, pid), e(t.isActive, true)),
+    orderBy: (t) => [desc(t.createdAt)],
+  });
+
+  return NextResponse.json({
+    product,
+    category,
+    salePrice: plan?.finalPrice ? Number(plan.finalPrice) : null,
+    snapshot: plan?.calcSnapshot ?? null,
+  });
+}
+
+// DELETE — 상품 삭제
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  await db.delete(schema.product).where(eq(schema.product.id, Number(id)));
+  return NextResponse.json({ ok: true });
 }

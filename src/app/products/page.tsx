@@ -110,7 +110,7 @@ export default function ProductsPage() {
         {rows.map((p) => (
           <Card key={p.id}>
             <CardContent className="space-y-3 p-4">
-              <div className="flex items-start justify-between gap-2">
+              <Link href={`/products/${p.id}`} className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-bold">{p.name}</p>
                   <p className="text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ export default function ProductsPage() {
                     {p.verdict}
                   </Badge>
                 )}
-              </div>
+              </Link>
 
               <div className="flex gap-2">
                 {p.status === "검토중" && (

@@ -88,6 +88,42 @@ export default function CalcPage() {
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  // ?load=<id> → 저장된 계산 불러와 수정
+  useEffect(() => {
+    const load = new URLSearchParams(window.location.search).get("load");
+    if (!load) return;
+    (async () => {
+      const r = await fetch(`/api/products/${load}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      const inp = j.snapshot?.inputs;
+      if (!inp) return;
+      const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+      setEditingId(Number(load));
+      setName(j.product?.name ?? "");
+      setSourceUrl(j.product?.sourceUrl ?? "");
+      setMajor(inp.major ?? "");
+      setMiddle(inp.middle ?? "");
+      setSourcing(inp.sourcing === "domestic" ? "domestic" : "overseas");
+      setCostCny(s(inp.costCny));
+      setCnInland(s(inp.cnInland));
+      setFx(s(inp.fx));
+      setFxEdited(true);
+      setSurcharge(s(inp.surcharge));
+      setCostKrw(s(inp.costKrw));
+      setDomShip(s(inp.domShip));
+      setShipMode(inp.shipMode === "once" ? "once" : "per");
+      setQty(s(inp.qty));
+      setOthers(Array.isArray(inp.others) ? inp.others : []);
+      setSalePrice(s(inp.salePrice));
+      setCommission(s(inp.commission));
+      setSizeType(inp.sizeType ?? "");
+      setInboundShip(s(inp.inboundShip));
+      setAdCost(s(inp.adCost));
+    })();
+  }, []);
 
   // 카테고리 캐스케이드
   const majors = useMemo(() => [...new Set(cats.map((c) => c.major))], [cats]);
@@ -185,6 +221,7 @@ export default function CalcPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          productId: editingId ?? undefined,
           name,
           sourceUrl: sourceUrl || undefined,
           categoryId: matchedCat?.id ?? null,
@@ -195,7 +232,7 @@ export default function CalcPage() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(JSON.stringify(j.error ?? j));
-      router.push("/products");
+      router.push(`/products/${j.productId}`);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
       setSaving(false);
@@ -207,7 +244,9 @@ export default function CalcPage() {
 
   return (
     <div className="space-y-4 pb-4">
-      <h1 className="text-2xl font-extrabold tracking-tight">마진 계산</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">
+        {editingId ? "마진 계산 수정" : "마진 계산"}
+      </h1>
 
       {/* 상품 정보 */}
       <Card>
@@ -458,7 +497,7 @@ export default function CalcPage() {
 
       {msg && <p className="text-sm text-destructive">{msg}</p>}
       <Button size="lg" className="w-full" onClick={save} disabled={saving}>
-        <Save /> {saving ? "저장 중…" : "후보로 저장하기"}
+        <Save /> {saving ? "저장 중…" : editingId ? "수정 저장하기" : "후보로 저장하기"}
       </Button>
     </div>
   );
