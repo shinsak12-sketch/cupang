@@ -16,7 +16,12 @@ const PUBLIC = ["/login", "/api/login", "/api/logout"];
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // 북마클릿(외부 origin) → 세션 제외, 각 라우트가 토큰 검증
   if (pathname.startsWith("/api/ingest")) return NextResponse.next();
+  // 쿠팡 북마클릿 POST(수집)만 세션 제외. GET(조회)은 로그인 필요.
+  if (pathname.startsWith("/api/coupang-research") && (req.method === "POST" || req.method === "OPTIONS")) {
+    return NextResponse.next();
+  }
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) return NextResponse.next();
 
   const pass = process.env.BASIC_AUTH_PASS;

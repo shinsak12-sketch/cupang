@@ -328,6 +328,31 @@ export const pricePlan = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* 상품 리서치 — 쿠팡 검색결과 수집 스냅샷 (경쟁분석 · 판매량 추정)          */
+/* ------------------------------------------------------------------ */
+
+export const coupangSnapshot = pgTable(
+  "coupang_snapshot",
+  {
+    id: serial("id").primaryKey(),
+    keyword: text("keyword").notNull(),
+    productId: text("product_id"), // 쿠팡 상품 id
+    name: text("name"),
+    price: integer("price"),
+    rating: numeric("rating", { precision: 3, scale: 2 }),
+    reviewCount: integer("review_count"),
+    isRocket: boolean("is_rocket").notNull().default(false),
+    isPb: boolean("is_pb").notNull().default(false), // 쿠팡 PB(코멧 등)
+    rank: integer("rank"),
+    collectedAt: timestamp("collected_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    byKeyword: index("coupang_snapshot_keyword_idx").on(t.keyword),
+    byProduct: index("coupang_snapshot_product_idx").on(t.productId),
+  })
+);
+
+/* ------------------------------------------------------------------ */
 /* Phase 2 (스키마만 미리 생성)                                          */
 /* ------------------------------------------------------------------ */
 
@@ -389,3 +414,4 @@ export type LotGroup = typeof lotGroup.$inferSelect;
 export type Lot = typeof lot.$inferSelect;
 export type Assumption = typeof assumption.$inferSelect;
 export type PricePlan = typeof pricePlan.$inferSelect;
+export type CoupangSnapshot = typeof coupangSnapshot.$inferSelect;

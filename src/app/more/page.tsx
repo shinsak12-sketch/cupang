@@ -9,11 +9,15 @@ import {
   DatabaseZap,
   Wallet,
   BarChart3,
+  Search,
+  Store,
   ChevronRight,
 } from "lucide-react";
 
 const ITEMS = [
-  { href: "/settings/setup", icon: DatabaseZap, title: "DB 셋업", desc: "최초 1회 · 스키마 생성 + 시딩", accent: true },
+  { href: "/research", icon: Search, title: "상품 찾기 (키워드·경쟁)", desc: "네이버 검색량 + 쿠팡 경쟁·판매량 추정", accent: true },
+  { href: "/settings/coupang-bookmarklet", icon: Store, title: "쿠팡 경쟁 북마클릿", desc: "검색결과 리뷰·PB·가격 수집" },
+  { href: "/settings/setup", icon: DatabaseZap, title: "DB 셋업", desc: "최초 1회 · 스키마 생성 + 시딩" },
   { href: "/compare", icon: BarChart3, title: "비교 분석", desc: "저장 상품 마진 순 랭킹" },
   { href: "/cashflow", icon: Wallet, title: "캐시플로우", desc: "결제→정산 현금 묶임·회수일" },
   { href: "/settings/fees", icon: Percent, title: "수수료 테이블", desc: "카테고리 요율 · 물류비 · 업로드(diff)" },
