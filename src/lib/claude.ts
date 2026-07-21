@@ -15,6 +15,7 @@ export type Candidate = {
 export type Recommendation = {
   keyword: string;
   verdict: "GOOD" | "OKAY" | "AVOID";
+  margin: "상" | "중" | "하" | null;
   reason: string;
   caution: string;
   monthlyVolume: number | null;
@@ -28,17 +29,21 @@ export type DiscoverResult = {
 };
 
 const SYSTEM = `당신은 1688(중국 도매) 소싱 → 쿠팡 로켓그로스 판매 전문가입니다.
-개인 셀러(1인)가 마진 좋은 상품군을 찾도록 돕습니다. 반드시 한국어로 답합니다.
+개인 셀러(1인)에게 "실제로 돈이 되는" 상품군을 찾아줍니다. 반드시 한국어로 답합니다.
 
-핵심 원칙:
-- 저단가 상품은 물류비(입출고비)·해외배송비 비중이 커서 마진이 무너지기 쉽다. 판매가 대비 원가+물류 구조를 항상 고려.
-- 쿠팡 PB(코멧 등)가 이미 장악한 카테고리는 가격경쟁이 불가능하니 피한다.
-- 세트 구성/묶음으로 객단가를 올릴 수 있는 상품이 유리.
-- 반품 시 위생 리스크(속옷·식품 접촉 등)나 파손 리스크가 큰 품목은 주의.
-- 계절/프로모션 절벽(신규 90일 후 노출 급감)을 고려.
-- 표준화되어 리뷰 경쟁이 이미 과열된 레드오션은 신규 진입이 어렵다.
+최우선 판단 기준은 딱 두 가지입니다:
+1) 수요 — 사람들이 실제로 많이 검색하는 상품이어야 한다. 검색량이 저조한 틈새는 경쟁이 없어도 진입 가치가 없다.
+2) 마진율 — 이게 가장 중요하다. 1688 사입원가 + 해외배송/입출고비 + 쿠팡 수수료를 다 빼고도 마진이 남아야 한다. 판매가 대비 원가가 낮아 마진 여력이 큰 상품을 최우선으로.
 
-개인 셀러 관점에서 현실적이고 구체적으로 판단하세요.`;
+태도:
+- 레드오션(경쟁 과열)이라는 이유만으로 배제하지 마라. 수요가 크고 마진이 남으면 경쟁이 치열해도 진입 가치가 있다.
+- 누구나 바로 떠올리는 "너무 뻔한 대표 키워드"만 나열하지 마라. 수요는 크되 마진 구조가 살아있는 지점을 찾아라.
+- 저단가 상품일수록 물류비 비중이 커 마진이 무너지기 쉬우니 마진 여력을 냉정하게 본다.
+- 세트/묶음으로 객단가를 올릴 수 있으면 마진에 유리.
+- 쿠팡 PB(코멧 등)가 원가 이하로 후려치는 구역은 '마진이 안 나오니' 감점 (레드오션이라서가 아니라 마진 때문).
+- 반품 위생/파손 리스크, 시즌 절벽은 참고로만 언급.
+
+수요 × 마진, 이 두 축으로 현실적이고 구체적으로 판단하세요.`;
 
 function extractJson(text: string): unknown {
   // ```json ... ``` 또는 첫 { / [ ~ 마지막 } / ] 사이 파싱
@@ -73,13 +78,16 @@ export async function discoverProducts(request: string): Promise<DiscoverResult>
 
   // 1) 후보 키워드 생성
   const genPrompt = `아래 요청에 맞는 쿠팡 판매 후보 상품 키워드를 15개 제안하세요.
-요청: "${request || "1688에서 소싱해서 쿠팡에 팔기 좋은, 경쟁이 덜하고 마진 나오는 상품군"}"
+요청: "${request || "1688에서 소싱해서 쿠팡에 팔기 좋은, 수요가 크면서 마진 여력이 남는 상품군"}"
 
-각 키워드는 실제로 소비자가 쿠팡/네이버에서 검색할 법한 구체적인 상품명이어야 합니다.
-(너무 넓은 "양말" 보다 "발가락 등산양말" 처럼 구체적으로)
+선정 기준(중요도 순):
+1) 사람들이 실제로 많이 검색하는(수요 있는) 상품일 것. 검색량 저조한 초틈새는 제외.
+2) 1688 사입원가가 낮아 마진 여력이 큰 상품 우선. (원가↓, 판매가 방어 가능, 세트화 가능)
+3) 레드오션이어도 마진이 남으면 포함. 단, 누구나 떠올리는 뻔한 대표 키워드만 나열하지 말 것.
+4) 소비자가 실제로 검색할 구체적 상품명. (넓은 "양말"보다 "발가락 등산양말")
 
 JSON 배열로만 답하세요. 다른 설명 없이:
-[{"keyword":"키워드","reason":"이걸 고른 이유(한 문장)"}]`;
+[{"keyword":"키워드","reason":"수요·마진 관점 선정 이유(한 문장)"}]`;
 
   const genText = await ask(client, genPrompt);
   let candidates: Candidate[] = [];
@@ -115,20 +123,24 @@ JSON 배열로만 답하세요. 다른 설명 없이:
     .join("\n");
 
   const rankPrompt = `아래는 후보 상품 키워드와 네이버 월간 검색량 데이터입니다.
-개인 셀러(1688→쿠팡)에게 유리한 순서로 상위 8개를 골라 평가하세요.
+"수요(검색량) × 마진 여력" 두 축으로 상위 8개를 골라 평가하세요.
 
-검색량이 너무 낮으면(수요 부족) 또는 너무 높은데 경쟁 극심하면 낮게 평가하세요.
-검색량 "미상"은 네이버 데이터가 없는 것이니 수요를 낮게 가정하세요.
+랭킹 원칙:
+1) 검색량이 충분히 높아야 한다(수요). 검색량이 너무 낮으면(예: 월 수백 이하) 진입 가치 없음 → AVOID.
+2) 마진 여력이 가장 중요하다. 1688 저원가 사입 + 판매가 방어 + 세트화로 마진이 남을지 냉정히 평가.
+3) 레드오션·경쟁 과열은 그 자체로 감점하지 마라. 수요 크고 마진 남으면 GOOD 가능.
+4) 검색량 "미상"은 네이버 데이터가 없는 것 → 수요 불확실로 보수적 평가.
 
 데이터:
 ${volLines}
 
 JSON 배열로만 답하세요:
-[{"keyword":"키워드","verdict":"GOOD|OKAY|AVOID","reason":"추천 이유(한두 문장)","caution":"주의점(한 문장)"}]
-verdict 기준: GOOD=적극추천, OKAY=검토가치, AVOID=비추천(이유 명시).`;
+[{"keyword":"키워드","verdict":"GOOD|OKAY|AVOID","margin":"상|중|하","reason":"수요·마진 근거(한두 문장)","caution":"주의점(한 문장)"}]
+verdict: GOOD=수요 충분+마진 여력 큼, OKAY=한쪽만 충족/검토가치, AVOID=수요 저조 또는 마진 안 남음(이유 명시).
+margin: 상=마진 여력 큼, 중=보통, 하=박함.`;
 
   const rankText = await ask(client, rankPrompt);
-  let ranked: Array<{ keyword: string; verdict: string; reason: string; caution: string }> = [];
+  let ranked: Array<{ keyword: string; verdict: string; margin?: string; reason: string; caution: string }> = [];
   try {
     ranked = extractJson(rankText) as typeof ranked;
   } catch {
@@ -141,9 +153,11 @@ verdict 기준: GOOD=적극추천, OKAY=검토가치, AVOID=비추천(이유 명
     .map((r) => {
       const v = volByKw.get(r.keyword.replace(/\s+/g, ""));
       const verdict = ["GOOD", "OKAY", "AVOID"].includes(r.verdict) ? r.verdict : "OKAY";
+      const margin = ["상", "중", "하"].includes(r.margin ?? "") ? (r.margin as "상" | "중" | "하") : null;
       return {
         keyword: r.keyword,
         verdict: verdict as Recommendation["verdict"],
+        margin,
         reason: r.reason ?? "",
         caution: r.caution ?? "",
         monthlyVolume: v ? v.monthlyVolume : null,

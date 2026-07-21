@@ -49,6 +49,7 @@ const CONF: Record<string, { label: string; variant: "outline" | "warn" | "cauti
 type Reco = {
   keyword: string;
   verdict: "GOOD" | "OKAY" | "AVOID";
+  margin: "상" | "중" | "하" | null;
   reason: string;
   caution: string;
   monthlyVolume: number | null;
@@ -420,10 +421,12 @@ function parseRecos(text: string): Reco[] {
   const okVerdict = (v: unknown): Reco["verdict"] =>
     v === "GOOD" || v === "OKAY" || v === "AVOID" ? v : "OKAY";
 
+  const okMargin = (m: unknown): Reco["margin"] => (m === "상" || m === "중" || m === "하" ? m : null);
+
   const out: Reco[] = [];
   for (const item of arr) {
     if (typeof item === "string") {
-      if (item.trim()) out.push({ keyword: item.trim(), verdict: "OKAY", reason: "", caution: "", monthlyVolume: null, comp: null });
+      if (item.trim()) out.push({ keyword: item.trim(), verdict: "OKAY", margin: null, reason: "", caution: "", monthlyVolume: null, comp: null });
       continue;
     }
     if (item && typeof item === "object") {
@@ -433,6 +436,7 @@ function parseRecos(text: string): Reco[] {
       out.push({
         keyword: kw,
         verdict: okVerdict(o.verdict),
+        margin: okMargin(o.margin),
         reason: typeof o.reason === "string" ? o.reason : "",
         caution: typeof o.caution === "string" ? o.caution : "",
         monthlyVolume: typeof o.monthlyVolume === "number" ? o.monthlyVolume : null,
@@ -454,9 +458,14 @@ function RecoList({ data, onPick }: { data: { recommendations: Reco[]; note: str
               <button onClick={() => onPick(r.keyword)} className="min-w-0 flex-1 text-left">
                 <span className="font-bold underline decoration-primary/40 underline-offset-2">{r.keyword}</span>
               </button>
-              <Badge variant={v.variant} className="shrink-0">
-                {v.label}
-              </Badge>
+              <div className="flex shrink-0 gap-1">
+                {r.margin && (
+                  <Badge variant={r.margin === "상" ? "go" : r.margin === "중" ? "caution" : "nogo"}>
+                    마진 {r.margin}
+                  </Badge>
+                )}
+                <Badge variant={v.variant}>{v.label}</Badge>
+              </div>
             </div>
             {r.reason && <p className="mt-1 text-sm">{r.reason}</p>}
             {r.caution && <p className="mt-1 text-xs text-muted-foreground">⚠ {r.caution}</p>}
