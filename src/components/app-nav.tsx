@@ -21,6 +21,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export function TopBar() {
   const pathname = usePathname();
+  if (pathname === "/login") return null;
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
@@ -54,6 +55,7 @@ export function TopBar() {
 
 export function BottomNav() {
   const pathname = usePathname();
+  if (pathname === "/login") return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-lg md:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5 px-2 pb-[env(safe-area-inset-bottom)]">

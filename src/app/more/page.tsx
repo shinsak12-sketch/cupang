@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "./LogoutButton";
 import {
   Percent,
   SlidersHorizontal,
@@ -59,6 +60,8 @@ export default function MorePage() {
           );
         })}
       </div>
+
+      <LogoutButton />
     </div>
   );
 }
