@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, TrendingUp, Store, Sparkles } from "lucide-react";
+import { Search, TrendingUp, Store, Sparkles, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,11 +80,63 @@ export default function ResearchPage() {
     },
   });
 
+  const [uploaded, setUploaded] = useState<{ recommendations: Reco[]; note: string } | null>(null);
+  const [fileErr, setFileErr] = useState("");
+  const [enriching, setEnriching] = useState(false);
+
   const runKeyword = (kw: string) => {
     setInput(kw);
     setQuery(kw);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  async function onFile(file: File) {
+    setFileErr("");
+    try {
+      const text = await file.text();
+      const recos = parseRecos(text);
+      if (recos.length === 0) throw new Error("파일에서 상품(keyword)을 찾지 못했어요.");
+
+      // 네이버 검색량 보강 (무료). 이미 값이 있으면 유지.
+      setEnriching(true);
+      let note = "업로드한 발굴 결과 (Claude 채팅으로 생성).";
+      try {
+        const need = recos.filter((r) => r.monthlyVolume == null).map((r) => r.keyword);
+        if (need.length) {
+          const r = await fetch("/api/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords: need }),
+          });
+          const j = (await r.json()) as {
+            volumes?: Record<string, { total: number; comp: string }>;
+            note?: string;
+          };
+          const vols = j.volumes ?? {};
+          const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+          const byNorm = new Map(Object.entries(vols).map(([k, v]) => [norm(k), v]));
+          for (const rec of recos) {
+            if (rec.monthlyVolume == null) {
+              const v = byNorm.get(norm(rec.keyword));
+              if (v) {
+                rec.monthlyVolume = v.total;
+                rec.comp = rec.comp ?? v.comp;
+              }
+            }
+          }
+          if (j.note) note += ` ${j.note}`;
+        }
+      } catch {
+        // 검색량 없이도 표시
+      } finally {
+        setEnriching(false);
+      }
+      setUploaded({ recommendations: recos, note });
+    } catch (e) {
+      setEnriching(false);
+      setFileErr(e instanceof Error ? e.message : "파일을 읽지 못했어요.");
+    }
+  }
 
   const naver = useQuery({
     queryKey: ["keyword", query],
@@ -154,9 +206,33 @@ export default function ResearchPage() {
             />
             <Button type="submit" className="w-full" disabled={discover.isPending}>
               <Sparkles className="h-4 w-4" />
-              {discover.isPending ? "Claude가 찾는 중… (5~15초)" : "AI로 상품군 발굴"}
+              {discover.isPending ? "Claude가 찾는 중… (5~15초)" : "AI로 상품군 발굴 (유료 API)"}
             </Button>
           </form>
+
+          {/* 무료: Claude 채팅으로 만든 파일 업로드 */}
+          <div className="mt-3 rounded-xl border border-dashed border-primary/40 p-3">
+            <p className="text-xs font-semibold">💰 무료: 파일로 올리기</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Claude 채팅에 &quot;상품 찾아서 발굴 파일 만들어줘&quot;라고 한 뒤, 받은 JSON 파일을 올리면
+              검색량까지 붙여서 아래처럼 보여줘요. (API 비용 0원)
+            </p>
+            <label className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-semibold hover:bg-accent">
+              <Upload className="h-4 w-4" />
+              {enriching ? "검색량 붙이는 중…" : "발굴 파일 업로드 (.json)"}
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {fileErr && <p className="mt-2 text-xs text-destructive">{fileErr}</p>}
+          </div>
 
           {discover.error && (
             <p className="mt-3 text-sm text-destructive">
@@ -168,50 +244,8 @@ export default function ResearchPage() {
             </p>
           )}
 
-          {discover.data && (
-            <div className="mt-4 space-y-2">
-              {discover.data.recommendations.map((r, i) => {
-                const v = VERDICT[r.verdict] ?? VERDICT.OKAY;
-                return (
-                  <div key={i} className={`rounded-xl border p-3 ${v.ring}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <button
-                        onClick={() => runKeyword(r.keyword)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <span className="font-bold underline decoration-primary/40 underline-offset-2">
-                          {r.keyword}
-                        </span>
-                      </button>
-                      <Badge variant={v.variant} className="shrink-0">
-                        {v.label}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm">{r.reason}</p>
-                    {r.caution && (
-                      <p className="mt-1 text-xs text-muted-foreground">⚠ {r.caution}</p>
-                    )}
-                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>
-                        월검색량{" "}
-                        <b className="tabular-nums text-foreground">
-                          {r.monthlyVolume != null ? r.monthlyVolume.toLocaleString("ko-KR") : "미상"}
-                        </b>
-                      </span>
-                      {r.comp && <span>· 경쟁 {r.comp}</span>}
-                      <button
-                        onClick={() => runKeyword(r.keyword)}
-                        className="ml-auto font-semibold text-primary"
-                      >
-                        이 키워드로 조사 →
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              <p className="pt-1 text-xs text-muted-foreground">{discover.data.note}</p>
-            </div>
-          )}
+          {uploaded && <RecoList data={uploaded} onPick={runKeyword} />}
+          {discover.data && <RecoList data={discover.data} onPick={runKeyword} />}
         </CardContent>
       </Card>
 
@@ -360,6 +394,82 @@ export default function ResearchPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+/** 업로드 파일 → Reco[] 정규화. 여러 형태 허용:
+ *  - ["키워드1","키워드2"]
+ *  - [{keyword, verdict, reason, caution, monthlyVolume, comp}]
+ *  - {recommendations:[...]}
+ */
+function parseRecos(text: string): Reco[] {
+  const data = JSON.parse(text);
+  const arr: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { recommendations?: unknown[] })?.recommendations)
+      ? (data as { recommendations: unknown[] }).recommendations
+      : [];
+
+  const okVerdict = (v: unknown): Reco["verdict"] =>
+    v === "GOOD" || v === "OKAY" || v === "AVOID" ? v : "OKAY";
+
+  const out: Reco[] = [];
+  for (const item of arr) {
+    if (typeof item === "string") {
+      if (item.trim()) out.push({ keyword: item.trim(), verdict: "OKAY", reason: "", caution: "", monthlyVolume: null, comp: null });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      const kw = typeof o.keyword === "string" ? o.keyword.trim() : "";
+      if (!kw) continue;
+      out.push({
+        keyword: kw,
+        verdict: okVerdict(o.verdict),
+        reason: typeof o.reason === "string" ? o.reason : "",
+        caution: typeof o.caution === "string" ? o.caution : "",
+        monthlyVolume: typeof o.monthlyVolume === "number" ? o.monthlyVolume : null,
+        comp: typeof o.comp === "string" ? o.comp : null,
+      });
+    }
+  }
+  return out;
+}
+
+function RecoList({ data, onPick }: { data: { recommendations: Reco[]; note: string }; onPick: (kw: string) => void }) {
+  return (
+    <div className="mt-4 space-y-2">
+      {data.recommendations.map((r, i) => {
+        const v = VERDICT[r.verdict] ?? VERDICT.OKAY;
+        return (
+          <div key={i} className={`rounded-xl border p-3 ${v.ring}`}>
+            <div className="flex items-start justify-between gap-2">
+              <button onClick={() => onPick(r.keyword)} className="min-w-0 flex-1 text-left">
+                <span className="font-bold underline decoration-primary/40 underline-offset-2">{r.keyword}</span>
+              </button>
+              <Badge variant={v.variant} className="shrink-0">
+                {v.label}
+              </Badge>
+            </div>
+            {r.reason && <p className="mt-1 text-sm">{r.reason}</p>}
+            {r.caution && <p className="mt-1 text-xs text-muted-foreground">⚠ {r.caution}</p>}
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                월검색량{" "}
+                <b className="tabular-nums text-foreground">
+                  {r.monthlyVolume != null ? r.monthlyVolume.toLocaleString("ko-KR") : "미상"}
+                </b>
+              </span>
+              {r.comp && <span>· 경쟁 {r.comp}</span>}
+              <button onClick={() => onPick(r.keyword)} className="ml-auto font-semibold text-primary">
+                이 키워드로 조사 →
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <p className="pt-1 text-xs text-muted-foreground">{data.note}</p>
     </div>
   );
 }
