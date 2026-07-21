@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Search, TrendingUp, Store, Sparkles, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,10 +84,13 @@ export default function ResearchPage() {
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
 
+  const resultsRef = useRef<HTMLDivElement>(null);
+
   const runKeyword = (kw: string) => {
     setInput(kw);
     setQuery(kw);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    // 조회 결과 카드 위치로 스크롤 (렌더 후)
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   };
 
   async function onFile(file: File) {
@@ -260,6 +263,9 @@ export default function ResearchPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* 조회 결과 스크롤 앵커 */}
+      <div ref={resultsRef} className="scroll-mt-4" />
 
       {/* 네이버 검색량 */}
       {query && (
