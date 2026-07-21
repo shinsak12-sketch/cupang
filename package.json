@@ -19,6 +19,7 @@
     "gen:embedded": "node scripts/gen-embedded.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.5",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-label": "^2.1.1",
