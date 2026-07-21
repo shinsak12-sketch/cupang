@@ -154,7 +154,7 @@ export default function ResearchPage() {
             />
             <Button type="submit" className="w-full" disabled={discover.isPending}>
               <Sparkles className="h-4 w-4" />
-              {discover.isPending ? "Claude가 찾는 중… (10~20초)" : "AI로 상품군 발굴"}
+              {discover.isPending ? "Claude가 찾는 중… (5~15초)" : "AI로 상품군 발굴"}
             </Button>
           </form>
 

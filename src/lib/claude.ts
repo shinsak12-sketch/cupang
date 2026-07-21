@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getVolumes, naverConfigured, type KeywordStat } from "@/lib/naver";
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-haiku-4-5";
 
 export function claudeConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
