@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { won, cn } from "@/lib/utils";
 import { usePersistentState } from "@/lib/persist";
-import { useSaved, toggleSaved } from "@/lib/saved";
+import { useSaved } from "@/lib/saved";
 
 type KwRow = { keyword: string; pc: number; mobile: number; total: number; comp: string };
 type Estimate = {
@@ -91,7 +91,7 @@ export default function ResearchPage() {
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
 
-  const saved = useSaved();
+  const { items: saved, toggle } = useSaved();
   const savedSet = new Set(saved.map((s) => s.keyword));
 
   const discover = useMutation({
@@ -119,7 +119,7 @@ export default function ResearchPage() {
     router.push(`/calc?name=${encodeURIComponent(r.keyword)}`);
   };
   const saveItem = (r: Reco) => {
-    toggleSaved({
+    toggle({
       keyword: r.keyword,
       verdict: r.verdict,
       margin: r.margin,

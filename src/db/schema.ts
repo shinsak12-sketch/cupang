@@ -352,6 +352,25 @@ export const coupangSnapshot = pgTable(
   })
 );
 
+// 상품찾기 → "아이템 저장" 후보 리스트 (DB 저장 → 기기 간 동기화)
+export const savedItem = pgTable(
+  "saved_item",
+  {
+    id: serial("id").primaryKey(),
+    keyword: text("keyword").notNull().unique(),
+    verdict: text("verdict"),
+    margin: text("margin"),
+    reason: text("reason"),
+    caution: text("caution"),
+    monthlyVolume: integer("monthly_volume"),
+    comp: text("comp"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    byCreated: index("saved_item_created_idx").on(t.createdAt),
+  })
+);
+
 /* ------------------------------------------------------------------ */
 /* Phase 2 (스키마만 미리 생성)                                          */
 /* ------------------------------------------------------------------ */
@@ -415,3 +434,4 @@ export type Lot = typeof lot.$inferSelect;
 export type Assumption = typeof assumption.$inferSelect;
 export type PricePlan = typeof pricePlan.$inferSelect;
 export type CoupangSnapshot = typeof coupangSnapshot.$inferSelect;
+export type SavedItem = typeof savedItem.$inferSelect;

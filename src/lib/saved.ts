@@ -1,77 +1,66 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-/** 상품찾기에서 "아이템 저장"한 후보 리스트 (기기 로컬 저장). */
+/** 상품찾기에서 "아이템 저장"한 후보 (Neon DB 저장 → 기기 간 동기화). */
 export type SavedItem = {
   keyword: string;
-  verdict?: string;
+  verdict?: string | null;
   margin?: string | null;
-  reason?: string;
-  caution?: string;
+  reason?: string | null;
+  caution?: string | null;
   monthlyVolume?: number | null;
   comp?: string | null;
-  savedAt: number;
 };
 
-const KEY = "cupang.saved.v1";
-const EMPTY: SavedItem[] = [];
-const listeners = new Set<() => void>();
+const KEY = ["saved"] as const;
 
-let cache: SavedItem[] = EMPTY;
-let cacheRaw = "";
-
-function read(): SavedItem[] {
-  if (typeof window === "undefined") return EMPTY;
-  const raw = localStorage.getItem(KEY) || "[]";
-  if (raw !== cacheRaw) {
-    cacheRaw = raw;
-    try {
-      const parsed = JSON.parse(raw);
-      cache = Array.isArray(parsed) ? parsed : EMPTY;
-    } catch {
-      cache = EMPTY;
-    }
-  }
-  return cache;
+async function fetchSaved(): Promise<SavedItem[]> {
+  const r = await fetch("/api/saved");
+  if (!r.ok) return [];
+  const j = (await r.json()) as { items?: SavedItem[] };
+  return j.items ?? [];
 }
 
-function write(items: SavedItem[]) {
-  localStorage.setItem(KEY, JSON.stringify(items));
-  cacheRaw = ""; // 다음 read에서 갱신
-  listeners.forEach((l) => l());
-}
+export function useSaved() {
+  const qc = useQueryClient();
+  const { data = [] } = useQuery({ queryKey: KEY, queryFn: fetchSaved, staleTime: 30_000 });
 
-export function addSaved(item: Omit<SavedItem, "savedAt">): boolean {
-  const items = read();
-  if (items.some((x) => x.keyword === item.keyword)) return false;
-  write([{ ...item, savedAt: Date.now() }, ...items]);
-  return true;
-}
+  const addM = useMutation({
+    mutationFn: async (item: SavedItem) => {
+      await fetch("/api/saved", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+    },
+    onMutate: async (item) => {
+      await qc.cancelQueries({ queryKey: KEY });
+      const prev = qc.getQueryData<SavedItem[]>(KEY) ?? [];
+      qc.setQueryData<SavedItem[]>(KEY, [item, ...prev.filter((x) => x.keyword !== item.keyword)]);
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(KEY, ctx.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
 
-export function removeSaved(keyword: string) {
-  write(read().filter((x) => x.keyword !== keyword));
-}
+  const removeM = useMutation({
+    mutationFn: async (keyword: string) => {
+      await fetch(`/api/saved?keyword=${encodeURIComponent(keyword)}`, { method: "DELETE" });
+    },
+    onMutate: async (keyword) => {
+      await qc.cancelQueries({ queryKey: KEY });
+      const prev = qc.getQueryData<SavedItem[]>(KEY) ?? [];
+      qc.setQueryData<SavedItem[]>(KEY, prev.filter((x) => x.keyword !== keyword));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(KEY, ctx.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
 
-export function toggleSaved(item: Omit<SavedItem, "savedAt">): boolean {
-  const items = read();
-  if (items.some((x) => x.keyword === item.keyword)) {
-    removeSaved(item.keyword);
-    return false;
-  }
-  addSaved(item);
-  return true;
-}
+  const has = (keyword: string) => data.some((x) => x.keyword === keyword);
+  const toggle = (item: SavedItem) => (has(item.keyword) ? removeM.mutate(item.keyword) : addM.mutate(item));
+  const remove = (keyword: string) => removeM.mutate(keyword);
 
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    listeners.delete(cb);
-    window.removeEventListener("storage", cb);
-  };
-}
-
-export function useSaved(): SavedItem[] {
-  return useSyncExternalStore(subscribe, read, () => EMPTY);
+  return { items: data, has, toggle, remove };
 }

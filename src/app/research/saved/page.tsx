@@ -7,14 +7,14 @@ import { RefreshCw, Calculator, Search, Trash2, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useSaved, removeSaved } from "@/lib/saved";
+import { useSaved } from "@/lib/saved";
 import { setPersisted } from "@/lib/persist";
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 export default function SavedListPage() {
   const router = useRouter();
-  const saved = useSaved();
+  const { items: saved, remove } = useSaved();
   const [vols, setVols] = useState<Record<string, { total: number; comp: string }>>({});
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
@@ -129,7 +129,7 @@ export default function SavedListPage() {
                     icon={Calculator}
                     label="마진계산"
                   />
-                  <MiniBtn onClick={() => removeSaved(r.keyword)} icon={Trash2} label="삭제" danger />
+                  <MiniBtn onClick={() => remove(r.keyword)} icon={Trash2} label="삭제" danger />
                 </div>
               </CardContent>
             </Card>
