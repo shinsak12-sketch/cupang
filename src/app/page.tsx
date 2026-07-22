@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, DatabaseZap, TrendingUp, CircleDot, Search } from "lucide-react";
+import { Plus, DatabaseZap, TrendingUp, CircleDot } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,18 +34,11 @@ export default function DashboardPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold tracking-tight">대시보드</h1>
-        <div className="flex gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/research">
-              <Search className="h-4 w-4" /> 찾기
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/calc">
-              <Plus className="h-4 w-4" /> 계산
-            </Link>
-          </Button>
-        </div>
+        <Button asChild size="sm">
+          <Link href="/calc">
+            <Plus className="h-4 w-4" /> 계산
+          </Link>
+        </Button>
       </div>
 
       {needsSetup && (

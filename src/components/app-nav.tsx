@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calculator, Package, ClipboardList, LayoutGrid } from "lucide-react";
+import { Home, Search, Calculator, Package, ClipboardList, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY = [
   { href: "/", label: "홈", icon: Home },
+  { href: "/research", label: "찾기", icon: Search },
   { href: "/calc", label: "계산", icon: Calculator },
   { href: "/products", label: "목록", icon: Package },
   { href: "/manage", label: "관리", icon: ClipboardList },
@@ -58,7 +59,7 @@ export function BottomNav() {
   if (pathname === "/login") return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-lg md:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-5 px-2 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto grid max-w-md grid-cols-6 px-1 pb-[env(safe-area-inset-bottom)]">
         {PRIMARY.map((n) => {
           const active = isActive(pathname, n.href);
           const Icon = n.icon;
@@ -73,7 +74,7 @@ export function BottomNav() {
             >
               <span
                 className={cn(
-                  "grid h-8 w-12 place-items-center rounded-full transition-colors",
+                  "grid h-8 w-11 place-items-center rounded-full transition-colors",
                   active && "bg-accent"
                 )}
               >

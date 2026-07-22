@@ -2,13 +2,28 @@
 
 import Link from "next/link";
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, TrendingUp, Store, Sparkles, Upload } from "lucide-react";
+import {
+  Search,
+  TrendingUp,
+  Store,
+  Sparkles,
+  Upload,
+  Copy,
+  Check,
+  Calculator,
+  Bookmark,
+  BookmarkCheck,
+  ListChecks,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { won } from "@/lib/utils";
+import { won, cn } from "@/lib/utils";
+import { usePersistentState } from "@/lib/persist";
+import { useSaved, toggleSaved } from "@/lib/saved";
 
 type KwRow = { keyword: string; pc: number; mobile: number; total: number; comp: string };
 type Estimate = {
@@ -64,9 +79,20 @@ const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo
 };
 
 export default function ResearchPage() {
-  const [input, setInput] = useState("");
-  const [query, setQuery] = useState("");
-  const [ask, setAsk] = useState("");
+  const router = useRouter();
+  const [input, setInput] = usePersistentState("research.input", "");
+  const [query, setQuery] = usePersistentState("research.query", "");
+  const [ask, setAsk] = usePersistentState("research.ask", "");
+  const [aiResult, setAiResult] = usePersistentState<DiscoverResult | null>("research.ai", null);
+  const [uploaded, setUploaded] = usePersistentState<{ recommendations: Reco[]; note: string } | null>(
+    "research.uploaded",
+    null
+  );
+  const [fileErr, setFileErr] = useState("");
+  const [enriching, setEnriching] = useState(false);
+
+  const saved = useSaved();
+  const savedSet = new Set(saved.map((s) => s.keyword));
 
   const discover = useMutation({
     mutationFn: async (askText: string): Promise<DiscoverResult> => {
@@ -79,19 +105,29 @@ export default function ResearchPage() {
       if (!r.ok) throw new Error(j.error ?? "발굴 실패");
       return j as DiscoverResult;
     },
+    onSuccess: (d) => setAiResult(d),
   });
-
-  const [uploaded, setUploaded] = useState<{ recommendations: Reco[]; note: string } | null>(null);
-  const [fileErr, setFileErr] = useState("");
-  const [enriching, setEnriching] = useState(false);
 
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const runKeyword = (kw: string) => {
     setInput(kw);
     setQuery(kw);
-    // 조회 결과 카드 위치로 스크롤 (렌더 후)
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+  const goCalc = (r: Reco) => {
+    router.push(`/calc?name=${encodeURIComponent(r.keyword)}`);
+  };
+  const saveItem = (r: Reco) => {
+    toggleSaved({
+      keyword: r.keyword,
+      verdict: r.verdict,
+      margin: r.margin,
+      reason: r.reason,
+      caution: r.caution,
+      monthlyVolume: r.monthlyVolume,
+      comp: r.comp,
+    });
   };
 
   async function onFile(file: File) {
@@ -165,11 +201,20 @@ export default function ResearchPage() {
   const exact = naver.data?.rows.find((r) => r.keyword.replace(/\s+/g, "") === query.replace(/\s+/g, "")) ?? naver.data?.rows[0];
   const related = (naver.data?.rows ?? []).filter((r) => r !== exact).slice(0, 20);
 
+  const cardProps = { onPick: runKeyword, onCalc: goCalc, onSave: saveItem, savedSet };
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">상품 찾기</h1>
-        <p className="text-sm text-muted-foreground">키워드 검색량(네이버) + 쿠팡 경쟁·판매량 추정</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">상품 찾기</h1>
+          <p className="text-sm text-muted-foreground">키워드 검색량(네이버) + 쿠팡 경쟁·판매량 추정</p>
+        </div>
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <Link href="/research/saved">
+            <ListChecks className="h-4 w-4" /> 저장{saved.length ? ` ${saved.length}` : ""}
+          </Link>
+        </Button>
       </div>
 
       <form
@@ -248,8 +293,8 @@ export default function ResearchPage() {
             </p>
           )}
 
-          {uploaded && <RecoList data={uploaded} onPick={runKeyword} />}
-          {discover.data && <RecoList data={discover.data} onPick={runKeyword} />}
+          {uploaded && <RecoList data={uploaded} {...cardProps} />}
+          {aiResult && <RecoList data={aiResult} {...cardProps} />}
         </CardContent>
       </Card>
 
@@ -407,7 +452,7 @@ export default function ResearchPage() {
 
 /** 업로드 파일 → Reco[] 정규화. 여러 형태 허용:
  *  - ["키워드1","키워드2"]
- *  - [{keyword, verdict, reason, caution, monthlyVolume, comp}]
+ *  - [{keyword, verdict, margin, reason, caution, monthlyVolume, comp}]
  *  - {recommendations:[...]}
  */
 function parseRecos(text: string): Reco[] {
@@ -447,45 +492,95 @@ function parseRecos(text: string): Reco[] {
   return out;
 }
 
-function RecoList({ data, onPick }: { data: { recommendations: Reco[]; note: string }; onPick: (kw: string) => void }) {
+type CardProps = {
+  onPick: (kw: string) => void;
+  onCalc: (r: Reco) => void;
+  onSave: (r: Reco) => void;
+  savedSet: Set<string>;
+};
+
+function RecoList({ data, ...actions }: { data: { recommendations: Reco[]; note: string } } & CardProps) {
   return (
     <div className="mt-4 space-y-2">
-      {data.recommendations.map((r, i) => {
-        const v = VERDICT[r.verdict] ?? VERDICT.OKAY;
-        return (
-          <div key={i} className={`rounded-xl border p-3 ${v.ring}`}>
-            <div className="flex items-start justify-between gap-2">
-              <button onClick={() => onPick(r.keyword)} className="min-w-0 flex-1 text-left">
-                <span className="font-bold underline decoration-primary/40 underline-offset-2">{r.keyword}</span>
-              </button>
-              <div className="flex shrink-0 gap-1">
-                {r.margin && (
-                  <Badge variant={r.margin === "상" ? "go" : r.margin === "중" ? "caution" : "nogo"}>
-                    마진 {r.margin}
-                  </Badge>
-                )}
-                <Badge variant={v.variant}>{v.label}</Badge>
-              </div>
-            </div>
-            {r.reason && <p className="mt-1 text-sm">{r.reason}</p>}
-            {r.caution && <p className="mt-1 text-xs text-muted-foreground">⚠ {r.caution}</p>}
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span>
-                월검색량{" "}
-                <b className="tabular-nums text-foreground">
-                  {r.monthlyVolume != null ? r.monthlyVolume.toLocaleString("ko-KR") : "미상"}
-                </b>
-              </span>
-              {r.comp && <span>· 경쟁 {r.comp}</span>}
-              <button onClick={() => onPick(r.keyword)} className="ml-auto font-semibold text-primary">
-                이 키워드로 조사 →
-              </button>
-            </div>
-          </div>
-        );
-      })}
+      {data.recommendations.map((r, i) => (
+        <RecoCard key={i} r={r} isSaved={actions.savedSet.has(r.keyword)} {...actions} />
+      ))}
       <p className="pt-1 text-xs text-muted-foreground">{data.note}</p>
     </div>
+  );
+}
+
+function RecoCard({ r, onPick, onCalc, onSave, isSaved }: { r: Reco; isSaved: boolean } & CardProps) {
+  const v = VERDICT[r.verdict] ?? VERDICT.OKAY;
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(r.keyword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* 클립보드 미지원 무시 */
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border p-3 ${v.ring}`}>
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 flex-1 font-bold">{r.keyword}</span>
+        <div className="flex shrink-0 gap-1">
+          {r.margin && (
+            <Badge variant={r.margin === "상" ? "go" : r.margin === "중" ? "caution" : "nogo"}>마진 {r.margin}</Badge>
+          )}
+          <Badge variant={v.variant}>{v.label}</Badge>
+        </div>
+      </div>
+      {r.reason && <p className="mt-1 text-sm">{r.reason}</p>}
+      {r.caution && <p className="mt-1 text-xs text-muted-foreground">⚠ {r.caution}</p>}
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        월검색량{" "}
+        <b className="tabular-nums text-foreground">
+          {r.monthlyVolume != null ? r.monthlyVolume.toLocaleString("ko-KR") : "미상"}
+        </b>
+        {r.comp && ` · 경쟁 ${r.comp}`}
+      </p>
+
+      <div className="mt-2 grid grid-cols-4 gap-1.5">
+        <ActBtn onClick={copy} icon={copied ? Check : Copy} label={copied ? "복사됨" : "이름복사"} active={copied} />
+        <ActBtn onClick={() => onPick(r.keyword)} icon={Search} label="키워드조사" />
+        <ActBtn onClick={() => onCalc(r)} icon={Calculator} label="마진계산" />
+        <ActBtn
+          onClick={() => onSave(r)}
+          icon={isSaved ? BookmarkCheck : Bookmark}
+          label={isSaved ? "저장됨" : "저장"}
+          active={isSaved}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActBtn({
+  onClick,
+  icon: Icon,
+  label,
+  active,
+}: {
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-0.5 rounded-lg border py-1.5 text-[11px] font-semibold transition-all active:scale-95",
+        active ? "border-primary bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:bg-accent"
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
   );
 }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
+import { InstallButton } from "@/components/install-button";
 import {
   Percent,
   SlidersHorizontal,
@@ -34,6 +35,8 @@ export default function MorePage() {
         <h1 className="text-2xl font-extrabold tracking-tight">더보기</h1>
         <p className="text-sm text-muted-foreground">설정 · 데이터 관리</p>
       </div>
+
+      <InstallButton />
 
       <div className="space-y-3">
         {ITEMS.map((it) => {

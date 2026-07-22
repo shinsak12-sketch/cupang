@@ -6,6 +6,9 @@ import { TopBar, BottomNav } from "@/components/app-nav";
 export const metadata: Metadata = {
   title: "마진계산기 — 쿠팡 로켓그로스",
   description: "사입 원가부터 입력해 이 상품 팔면 얼마 남는지 계산·관리",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "마진계산기" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {

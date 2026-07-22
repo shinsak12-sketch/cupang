@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Trash2, Save, Package, Percent, Megaphone } from "lucide-react";
+import { Plus, Trash2, Save, Package, Percent, Megaphone, RotateCcw } from "lucide-react";
+import { usePersistentState, clearPersisted } from "@/lib/persist";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,20 +44,20 @@ export default function CalcPage() {
     },
   });
 
-  // 상품
-  const [name, setName] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [major, setMajor] = useState("");
-  const [middle, setMiddle] = useState("");
+  // 상품 (화면 전환에도 유지 — 엑셀 시트처럼)
+  const [name, setName] = usePersistentState("calc.name", "");
+  const [sourceUrl, setSourceUrl] = usePersistentState("calc.sourceUrl", "");
+  const [major, setMajor] = usePersistentState("calc.major", "");
+  const [middle, setMiddle] = usePersistentState("calc.middle", "");
 
   // 사입
-  const [sourcing, setSourcing] = useState<"overseas" | "domestic">("overseas");
+  const [sourcing, setSourcing] = usePersistentState<"overseas" | "domestic">("calc.sourcing", "overseas");
   // 해외 (중국): (원가위안 + 내륙운송비위안) × (환율 + 가산)
-  const [costCny, setCostCny] = useState("");
-  const [cnInland, setCnInland] = useState("");
-  const [fx, setFx] = useState("190");
-  const [fxEdited, setFxEdited] = useState(false);
-  const [surcharge, setSurcharge] = useState("80");
+  const [costCny, setCostCny] = usePersistentState("calc.costCny", "");
+  const [cnInland, setCnInland] = usePersistentState("calc.cnInland", "");
+  const [fx, setFx] = usePersistentState("calc.fx", "190");
+  const [fxEdited, setFxEdited] = usePersistentState("calc.fxEdited", false);
+  const [surcharge, setSurcharge] = usePersistentState("calc.surcharge", "80");
 
   // 환율 자동 (CNY→KRW). 사용자가 직접 고치기 전까지만 자동 반영.
   const { data: fxData } = useQuery({
@@ -73,22 +74,48 @@ export default function CalcPage() {
     if (fxData?.rate && !fxEdited) setFx(String(fxData.rate));
   }, [fxData, fxEdited]);
   // 국내
-  const [costKrw, setCostKrw] = useState("");
-  const [domShip, setDomShip] = useState("");
-  const [shipMode, setShipMode] = useState<"per" | "once">("per");
-  const [qty, setQty] = useState("1");
-  const [others, setOthers] = useState<{ label: string; amount: string }[]>([]);
+  const [costKrw, setCostKrw] = usePersistentState("calc.costKrw", "");
+  const [domShip, setDomShip] = usePersistentState("calc.domShip", "");
+  const [shipMode, setShipMode] = usePersistentState<"per" | "once">("calc.shipMode", "per");
+  const [qty, setQty] = usePersistentState("calc.qty", "1");
+  const [others, setOthers] = usePersistentState<{ label: string; amount: string }[]>("calc.others", []);
 
   // 판매
-  const [salePrice, setSalePrice] = useState("");
-  const [commission, setCommission] = useState("10.8");
-  const [sizeType, setSizeType] = useState("");
-  const [inboundShip, setInboundShip] = useState("");
-  const [adCost, setAdCost] = useState("");
+  const [salePrice, setSalePrice] = usePersistentState("calc.salePrice", "");
+  const [commission, setCommission] = usePersistentState("calc.commission", "10.8");
+  const [sizeType, setSizeType] = usePersistentState("calc.sizeType", "");
+  const [inboundShip, setInboundShip] = usePersistentState("calc.inboundShip", "");
+  const [adCost, setAdCost] = usePersistentState("calc.adCost", "");
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = usePersistentState<number | null>("calc.editingId", null);
+
+  function resetForm() {
+    clearPersisted("calc.");
+    setName("");
+    setSourceUrl("");
+    setMajor("");
+    setMiddle("");
+    setSourcing("overseas");
+    setCostCny("");
+    setCnInland("");
+    setFxEdited(false);
+    setFx(fxData?.rate ? String(fxData.rate) : "190");
+    setSurcharge("80");
+    setCostKrw("");
+    setDomShip("");
+    setShipMode("per");
+    setQty("1");
+    setOthers([]);
+    setSalePrice("");
+    setCommission("10.8");
+    setSizeType("");
+    setInboundShip("");
+    setAdCost("");
+    setEditingId(null);
+    setMsg(null);
+  }
 
   // ?load=<id> → 저장된 계산 불러와 수정
   useEffect(() => {
@@ -123,6 +150,16 @@ export default function CalcPage() {
       setInboundShip(s(inp.inboundShip));
       setAdCost(s(inp.adCost));
     })();
+  }, []);
+
+  // ?name= / ?link= → 상품찾기에서 넘어올 때 프리필 (기존 입력이 있으면 유지)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const nm = p.get("name");
+    const link = p.get("link");
+    if (nm) setName((prev) => prev || nm);
+    if (link) setSourceUrl((prev) => prev || link);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 카테고리 캐스케이드
@@ -244,9 +281,14 @@ export default function CalcPage() {
 
   return (
     <div className="space-y-4 pb-4">
-      <h1 className="text-2xl font-extrabold tracking-tight">
-        {editingId ? "마진 계산 수정" : "마진 계산"}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {editingId ? "마진 계산 수정" : "마진 계산"}
+        </h1>
+        <Button size="sm" variant="outline" onClick={resetForm}>
+          <RotateCcw className="h-4 w-4" /> 새 계산
+        </Button>
+      </div>
 
       {/* 상품 정보 */}
       <Card>

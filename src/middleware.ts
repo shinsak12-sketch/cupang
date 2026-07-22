@@ -8,7 +8,7 @@ import { sessionToken, SESSION_COOKIE } from "@/lib/auth";
  * - 그 외 : 세션 쿠키 없으면 페이지는 /login 리다이렉트, API는 401
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg).*)"],
 };
 
 const PUBLIC = ["/login", "/api/login", "/api/logout"];
