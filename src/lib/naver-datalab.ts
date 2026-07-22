@@ -1,9 +1,11 @@
 /**
- * 네이버 데이터랩 검색어 트렌드 API (openapi.naver.com).
- * 🔴 검색광고 키워드도구(searchad)와 다른 계정/키: developers.naver.com 발급.
- * env: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
+ * 네이버 클라우드(NCP) 데이터랩 검색어 트렌드 API.
+ * 🔴 console.ncloud.com > AI·NAVER API > Application 의 "인증 정보"(Client ID/Secret)를 사용.
+ * env: NAVER_CLIENT_ID(=NCP Client ID), NAVER_CLIENT_SECRET(=NCP Client Secret)
  * 최근 12개월 상대 검색량 추이로 "수요가 오르는지/내리는지" 판단.
  */
+const NCP_DATALAB = "https://naveropenapi.apigw.ntruss.com/datalab/v1/search";
+
 export function datalabConfigured(): boolean {
   return !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
 }
@@ -25,11 +27,11 @@ export async function getSearchTrend(keyword: string): Promise<Trend | null> {
   start.setDate(1);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
-  const r = await fetch("https://openapi.naver.com/v1/datalab/search", {
+  const r = await fetch(NCP_DATALAB, {
     method: "POST",
     headers: {
-      "X-Naver-Client-Id": id,
-      "X-Naver-Client-Secret": secret,
+      "X-NCP-APIGW-API-KEY-ID": id,
+      "X-NCP-APIGW-API-KEY": secret,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
