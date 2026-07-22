@@ -204,10 +204,12 @@ export default function ResearchPage() {
     queryKey: ["trend", query],
     enabled: !!query,
     staleTime: 3600_000,
+    retry: false,
     queryFn: async () => {
       const r = await fetch(`/api/trend?q=${encodeURIComponent(query)}`);
-      if (!r.ok) return null;
-      return (await r.json()) as { direction: "up" | "flat" | "down"; changePct: number | null; series: number[] };
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "트렌드 조회 실패");
+      return j as { direction: "up" | "flat" | "down"; changePct: number | null; series: number[] };
     },
   });
 
@@ -356,12 +358,25 @@ export default function ResearchPage() {
                 </Badge>
               </div>
             )}
+            {trend.isLoading && <p className="mt-2 text-xs text-muted-foreground">트렌드 조회 중…</p>}
+            {trend.error && (
+              <p className="mt-2 text-xs text-destructive">
+                트렌드: {String((trend.error as Error).message)}
+                <br />
+                <span className="text-muted-foreground">
+                  데이터랩 키(NAVER_CLIENT_ID / NAVER_CLIENT_SECRET) 설정 + 재배포를 확인하세요.
+                </span>
+              </p>
+            )}
             {trend.data && trend.data.series.length > 3 && (
               <div className="mt-2 flex items-center gap-2">
                 <TrendBadge dir={trend.data.direction} pct={trend.data.changePct} />
                 <Sparkline data={trend.data.series} dir={trend.data.direction} />
                 <span className="text-xs text-muted-foreground">최근 12개월</span>
               </div>
+            )}
+            {trend.data && trend.data.series.length <= 3 && (
+              <p className="mt-2 text-xs text-muted-foreground">이 키워드는 데이터랩 추세 데이터가 부족해요.</p>
             )}
             {related.length > 0 && (
               <div className="mt-3">
