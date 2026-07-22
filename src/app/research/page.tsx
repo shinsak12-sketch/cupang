@@ -7,6 +7,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Search,
   TrendingUp,
+  TrendingDown,
+  Minus,
   Store,
   Sparkles,
   Upload,
@@ -198,6 +200,17 @@ export default function ResearchPage() {
     },
   });
 
+  const trend = useQuery({
+    queryKey: ["trend", query],
+    enabled: !!query,
+    staleTime: 3600_000,
+    queryFn: async () => {
+      const r = await fetch(`/api/trend?q=${encodeURIComponent(query)}`);
+      if (!r.ok) return null;
+      return (await r.json()) as { direction: "up" | "flat" | "down"; changePct: number | null; series: number[] };
+    },
+  });
+
   const exact = naver.data?.rows.find((r) => r.keyword.replace(/\s+/g, "") === query.replace(/\s+/g, "")) ?? naver.data?.rows[0];
   const related = (naver.data?.rows ?? []).filter((r) => r !== exact).slice(0, 20);
 
@@ -341,6 +354,13 @@ export default function ResearchPage() {
                 <Badge variant="outline" className="mb-1 ml-auto">
                   경쟁 {exact.comp}
                 </Badge>
+              </div>
+            )}
+            {trend.data && trend.data.series.length > 3 && (
+              <div className="mt-2 flex items-center gap-2">
+                <TrendBadge dir={trend.data.direction} pct={trend.data.changePct} />
+                <Sparkline data={trend.data.series} dir={trend.data.direction} />
+                <span className="text-xs text-muted-foreground">최근 12개월</span>
               </div>
             )}
             {related.length > 0 && (
@@ -581,6 +601,47 @@ function ActBtn({
       <Icon className="h-4 w-4" />
       {label}
     </button>
+  );
+}
+
+function TrendBadge({ dir, pct }: { dir: "up" | "flat" | "down"; pct: number | null }) {
+  if (dir === "up")
+    return (
+      <Badge variant="go" className="gap-1">
+        <TrendingUp className="h-3.5 w-3.5" /> 상승{pct != null ? ` +${pct}%` : ""}
+      </Badge>
+    );
+  if (dir === "down")
+    return (
+      <Badge variant="nogo" className="gap-1">
+        <TrendingDown className="h-3.5 w-3.5" /> 하락{pct != null ? ` ${pct}%` : ""}
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="gap-1">
+      <Minus className="h-3.5 w-3.5" /> 보합
+    </Badge>
+  );
+}
+
+function Sparkline({ data, dir }: { data: number[]; dir: "up" | "flat" | "down" }) {
+  const w = 72;
+  const h = 22;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data);
+  const span = max - min || 1;
+  const pts = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / span) * (h - 2) - 1;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const stroke = dir === "up" ? "#059669" : dir === "down" ? "#dc2626" : "#94a3b8";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden>
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
