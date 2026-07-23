@@ -360,13 +360,7 @@ export default function ResearchPage() {
             )}
             {trend.isLoading && <p className="mt-2 text-xs text-muted-foreground">트렌드 조회 중…</p>}
             {trend.error && (
-              <p className="mt-2 text-xs text-destructive">
-                트렌드: {String((trend.error as Error).message)}
-                <br />
-                <span className="text-muted-foreground">
-                  데이터랩 키(NAVER_CLIENT_ID / NAVER_CLIENT_SECRET) 설정 + 재배포를 확인하세요.
-                </span>
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">트렌드 미연동 · 네이버 데이터랩 이용신청 후 자동 표시</p>
             )}
             {trend.data && trend.data.series.length > 3 && (
               <div className="mt-2 flex items-center gap-2">
