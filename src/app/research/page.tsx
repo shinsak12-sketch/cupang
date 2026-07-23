@@ -338,10 +338,10 @@ export default function ResearchPage() {
           <div className="mb-1 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <span className="font-bold">분야 트렌드</span>
-            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류 · 전년비</span>
+            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류 · 상대 성과</span>
           </div>
           <p className="mb-2 text-[11px] text-muted-foreground">
-            최근 3·6·12개월을 <b>작년 같은 기간</b>과 비교(계절 상쇄). +면 작년보다 수요↑
+            전년 동기 대비를 <b>전분야 평균과 비교</b>. +면 시장평균보다 선전(상대적으로 뜨는 분야).
           </p>
           {insight.isLoading && <p className="mt-2 text-sm text-muted-foreground">조회 중…</p>}
           {insight.error && (

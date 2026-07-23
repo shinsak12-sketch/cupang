@@ -112,5 +112,19 @@ export async function allCategoryTrendsMulti(): Promise<CategoryMulti[]> {
     const firstErr = settled.find((s) => s.status === "rejected") as PromiseRejectedResult | undefined;
     if (firstErr) throw firstErr.reason;
   }
-  return ok;
+
+  // 🔴 네이버쇼핑 전체 클릭이 YoY로 하락세 → 절대 YoY는 전 분야가 -로 깔림.
+  // 전 분야 평균을 빼서 "상대 성과"로 변환: +면 시장평균보다 선전(상대적으로 뜨는 분야).
+  const keys = ["p3", "p6", "p12"] as const;
+  const means: Record<string, number> = {};
+  for (const k of keys) {
+    const vals = ok.map((c) => c[k].changePct).filter((v): v is number => v != null);
+    means[k] = vals.length ? avg(vals) : 0;
+  }
+  const rel = (p: Pt, k: (typeof keys)[number]): Pt => {
+    if (p.changePct == null) return p;
+    const r = Math.round(p.changePct - means[k]);
+    return { changePct: r, direction: r >= 5 ? "up" : r <= -5 ? "down" : "flat" };
+  };
+  return ok.map((c) => ({ ...c, p3: rel(c.p3, "p3"), p6: rel(c.p6, "p6"), p12: rel(c.p12, "p12") }));
 }
