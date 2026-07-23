@@ -80,6 +80,19 @@ const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo
   AVOID: { label: "비추천", variant: "nogo", ring: "border-red-300/40 opacity-80" },
 };
 
+const NAVER_CATS: { name: string; cid: string }[] = [
+  { name: "패션의류", cid: "50000000" },
+  { name: "패션잡화", cid: "50000001" },
+  { name: "화장품/미용", cid: "50000002" },
+  { name: "디지털/가전", cid: "50000003" },
+  { name: "가구/인테리어", cid: "50000004" },
+  { name: "출산/육아", cid: "50000005" },
+  { name: "식품", cid: "50000006" },
+  { name: "스포츠/레저", cid: "50000007" },
+  { name: "생활/건강", cid: "50000008" },
+  { name: "여가/생활편의", cid: "50000009" },
+];
+
 export default function ResearchPage() {
   const router = useRouter();
   const [input, setInput] = usePersistentState("research.input", "");
@@ -92,6 +105,20 @@ export default function ResearchPage() {
   );
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
+  const [insightCid, setInsightCid] = usePersistentState("research.insightCid", "");
+
+  const insight = useQuery({
+    queryKey: ["insight", insightCid],
+    enabled: !!insightCid,
+    staleTime: 3600_000,
+    retry: false,
+    queryFn: async () => {
+      const r = await fetch(`/api/insight?cid=${insightCid}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "쇼핑인사이트 실패");
+      return j as { direction: "up" | "flat" | "down"; changePct: number | null; series: number[] };
+    },
+  });
 
   const { items: saved, toggle } = useSaved();
   const savedSet = new Set(saved.map((s) => s.keyword));
@@ -310,6 +337,40 @@ export default function ResearchPage() {
 
           {uploaded && <RecoList data={uploaded} {...cardProps} />}
           {aiResult && <RecoList data={aiResult} {...cardProps} />}
+        </CardContent>
+      </Card>
+
+      {/* 분야 트렌드 (네이버 쇼핑인사이트) */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span className="font-bold">분야 트렌드</span>
+            <span className="text-xs text-muted-foreground">네이버쇼핑 분야별 12개월</span>
+          </div>
+          <select
+            value={insightCid}
+            onChange={(e) => setInsightCid(e.target.value)}
+            className="h-11 w-full rounded-xl border-2 border-input bg-card px-3 text-base focus-visible:border-primary/50 focus-visible:outline-none"
+          >
+            <option value="">분야 선택</option>
+            {NAVER_CATS.map((c) => (
+              <option key={c.cid} value={c.cid}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {insight.isLoading && <p className="mt-2 text-sm text-muted-foreground">조회 중…</p>}
+          {insight.error && (
+            <p className="mt-2 text-xs text-muted-foreground">쇼핑인사이트 미연동 · NCP 키 확인</p>
+          )}
+          {insight.data && insight.data.series.length > 3 && (
+            <div className="mt-3 flex items-center gap-2">
+              <TrendBadge dir={insight.data.direction} pct={insight.data.changePct} />
+              <Sparkline data={insight.data.series} dir={insight.data.direction} />
+              <span className="text-xs text-muted-foreground">최근 12개월</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
