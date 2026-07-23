@@ -58,6 +58,10 @@ export default function CalcPage() {
   const [fx, setFx] = usePersistentState("calc.fx", "190");
   const [fxEdited, setFxEdited] = usePersistentState("calc.fxEdited", false);
   const [surcharge, setSurcharge] = usePersistentState("calc.surcharge", "80");
+  // 수입 관세·부가세 (사업자 일반수입)
+  const [customsOn, setCustomsOn] = usePersistentState("calc.customsOn", false);
+  const [tariffPct, setTariffPct] = usePersistentState("calc.tariffPct", "8");
+  const [vatOn, setVatOn] = usePersistentState("calc.vatOn", false);
 
   // 환율 자동 (CNY→KRW). 사용자가 직접 고치기 전까지만 자동 반영.
   const { data: fxData } = useQuery({
@@ -103,6 +107,9 @@ export default function CalcPage() {
     setFxEdited(false);
     setFx(fxData?.rate ? String(fxData.rate) : "190");
     setSurcharge("80");
+    setCustomsOn(false);
+    setTariffPct("8");
+    setVatOn(false);
     setCostKrw("");
     setDomShip("");
     setShipMode("per");
@@ -139,6 +146,9 @@ export default function CalcPage() {
       setFx(s(inp.fx));
       setFxEdited(true);
       setSurcharge(s(inp.surcharge));
+      setCustomsOn(!!inp.customsOn);
+      if (inp.tariffPct != null) setTariffPct(String(inp.tariffPct));
+      setVatOn(!!inp.vatOn);
       setCostKrw(s(inp.costKrw));
       setDomShip(s(inp.domShip));
       setShipMode(inp.shipMode === "once" ? "once" : "per");
@@ -205,7 +215,11 @@ export default function CalcPage() {
   const domesticSourcing = n(costKrw) + domShipPerUnit;
   const sourcingCost = sourcing === "overseas" ? overseasSourcing : domesticSourcing;
   const othersSum = others.reduce((s, o) => s + n(o.amount), 0);
-  const landedCost = sourcingCost + othersSum;
+  // 관세는 해외(수입)에만. 과세가격 ≈ 수입대행비(물품가+운송)
+  const dutiable = sourcing === "overseas" ? overseasSourcing : 0;
+  const duty = customsOn ? Math.round(dutiable * (n(tariffPct) / 100)) : 0;
+  const importVat = customsOn && vatOn ? Math.round((dutiable + duty) * 0.1) : 0;
+  const landedCost = sourcingCost + othersSum + duty + importVat;
   // 최초원가(원가만, 원 환산) — 위안 입력시 헷갈리지 않게 착지원가 옆에 함께 표시
   const baseCostKrw =
     sourcing === "overseas" ? Math.round(n(costCny) * effRate) : n(costKrw);
@@ -238,6 +252,9 @@ export default function CalcPage() {
           cnInland: n(cnInland),
           fx: n(fx),
           surcharge: n(surcharge),
+          customsOn,
+          tariffPct: n(tariffPct),
+          vatOn,
           // 국내
           costKrw: n(costKrw),
           domShip: n(domShip),
@@ -386,6 +403,41 @@ export default function CalcPage() {
                   <span className="tabular-nums">{won(overseasSourcing)}</span>
                 </div>
               </div>
+
+              {/* 수입 관세·부가세 */}
+              <div className="rounded-xl border-2 border-input p-3">
+                <label className="flex cursor-pointer items-center justify-between">
+                  <span className="text-sm font-medium">수입 관세 적용 <span className="text-xs text-muted-foreground">(사업자 일반수입)</span></span>
+                  <input
+                    type="checkbox"
+                    checked={customsOn}
+                    onChange={(e) => setCustomsOn(e.target.checked)}
+                    className="h-5 w-5 accent-primary"
+                  />
+                </label>
+                {customsOn && (
+                  <div className="mt-3 space-y-2">
+                    <Field label="관세율 % (품목 HS 기준)">
+                      <Input value={tariffPct} onChange={(e) => setTariffPct(e.target.value)} inputMode="decimal" placeholder="8" />
+                    </Field>
+                    <label className="flex cursor-pointer items-center justify-between rounded-lg bg-muted px-3 py-2">
+                      <span className="text-sm">
+                        부가세(10%) 포함 <span className="text-xs text-muted-foreground">보통 매입공제됨</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={vatOn}
+                        onChange={(e) => setVatOn(e.target.checked)}
+                        className="h-5 w-5 accent-primary"
+                      />
+                    </label>
+                    <div className="rounded-xl bg-muted px-3.5 py-2 text-sm">
+                      <BreakRow label={`관세 (${n(tariffPct) || 0}%)`} value={won(duty)} />
+                      {vatOn && <BreakRow label="수입부가세 (10%)" value={won(importVat)} />}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -458,6 +510,12 @@ export default function CalcPage() {
                 {sourcing === "overseas" ? `${n(costCny) || 0}¥ ≈ ${won(baseCostKrw)}` : won(baseCostKrw)}
               </span>
             </div>
+            {customsOn && duty > 0 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>+ 관세{vatOn ? "·부가세" : ""}</span>
+                <span className="tabular-nums">{won(duty + importVat)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="font-semibold">= 착지원가 (개당)</span>
               <span className="text-xl font-extrabold tabular-nums">{won(landedCost)}</span>
