@@ -288,30 +288,33 @@ JSON:
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">상품 찾기</h1>
-          <p className="text-sm text-muted-foreground">키워드 검색량(네이버) + 쿠팡 경쟁·판매량 추정</p>
+      {/* 검색 헤더 — 스크롤해도 상단 고정 */}
+      <div className="sticky top-14 z-20 -mx-4 space-y-3 border-b border-border/60 bg-background/95 px-4 pb-3 pt-2 backdrop-blur">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight">상품 찾기</h1>
+            <p className="text-sm text-muted-foreground">키워드 검색량(네이버) + 쿠팡 경쟁·판매량 추정</p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <Link href="/research/saved">
+              <ListChecks className="h-4 w-4" /> 저장{saved.length ? ` ${saved.length}` : ""}
+            </Link>
+          </Button>
         </div>
-        <Button asChild size="sm" variant="outline" className="shrink-0">
-          <Link href="/research/saved">
-            <ListChecks className="h-4 w-4" /> 저장{saved.length ? ` ${saved.length}` : ""}
-          </Link>
-        </Button>
-      </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setQuery(input.trim());
-        }}
-        className="flex gap-2"
-      >
-        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="예: 순면 양말" />
-        <Button type="submit" disabled={!input.trim()}>
-          <Search className="h-4 w-4" /> 조회
-        </Button>
-      </form>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(input.trim());
+          }}
+          className="flex gap-2"
+        >
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="예: 순면 양말" />
+          <Button type="submit" disabled={!input.trim()}>
+            <Search className="h-4 w-4" /> 조회
+          </Button>
+        </form>
+      </div>
 
       {/* AI 상품 발굴 (Claude) */}
       <Card className="border-2 border-primary/30 bg-gradient-to-br from-accent to-transparent shadow-pop">
