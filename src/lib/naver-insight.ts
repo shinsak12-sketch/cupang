@@ -90,3 +90,42 @@ export async function allCategoryTrends(months = 12): Promise<CategoryTrend[]> {
   }
   return ok;
 }
+
+export type Pt = { direction: Trend["direction"]; changePct: number | null };
+export type CategoryMulti = {
+  name: string;
+  cid: string;
+  p3: Pt;
+  p6: Pt;
+  p12: Pt;
+  series: number[]; // 12개월 스파크라인용
+};
+
+/** 대분류별 3·6·12개월 추이를 한 번에. */
+export async function allCategoryTrendsMulti(): Promise<CategoryMulti[]> {
+  const [r3, r6, r12] = await Promise.allSettled([
+    allCategoryTrends(3),
+    allCategoryTrends(6),
+    allCategoryTrends(12),
+  ]);
+  const val = (r: PromiseSettledResult<CategoryTrend[]>) =>
+    r.status === "fulfilled" ? r.value : [];
+  if (val(r3).length === 0 && val(r6).length === 0 && val(r12).length === 0) {
+    const err = [r3, r6, r12].find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+    if (err) throw err.reason;
+  }
+  const by = (arr: CategoryTrend[]) => new Map(arr.map((x) => [x.cid, x]));
+  const m3 = by(val(r3));
+  const m6 = by(val(r6));
+  const m12 = by(val(r12));
+  const pt = (t?: CategoryTrend): Pt => (t ? { direction: t.direction, changePct: t.changePct } : { direction: "flat", changePct: null });
+
+  return NAVER_CATEGORIES.map((c) => ({
+    name: c.name,
+    cid: c.cid,
+    p3: pt(m3.get(c.cid)),
+    p6: pt(m6.get(c.cid)),
+    p12: pt(m12.get(c.cid)),
+    series: m12.get(c.cid)?.series ?? [],
+  }));
+}

@@ -73,6 +73,7 @@ type Reco = {
   comp: string | null;
 };
 type DiscoverResult = { ask: string; recommendations: Reco[]; note: string };
+type Pt = { direction: "up" | "flat" | "down"; changePct: number | null };
 
 const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo"; ring: string }> = {
   GOOD: { label: "추천", variant: "go", ring: "border-emerald-400/50 bg-emerald-50/50 dark:bg-emerald-950/20" },
@@ -92,21 +93,20 @@ export default function ResearchPage() {
   );
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
-  const [insightMonths, setInsightMonths] = usePersistentState("research.insightMonths", 12);
-
   const insight = useQuery({
-    queryKey: ["insight-all", insightMonths],
+    queryKey: ["insight-multi"],
     staleTime: 6 * 3600_000,
     retry: false,
     queryFn: async () => {
-      const r = await fetch(`/api/insight?months=${insightMonths}`);
+      const r = await fetch(`/api/insight`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "쇼핑인사이트 실패");
       return (j.items ?? []) as {
         name: string;
         cid: string;
-        direction: "up" | "flat" | "down";
-        changePct: number | null;
+        p3: Pt;
+        p6: Pt;
+        p12: Pt;
         series: number[];
       }[];
     },
@@ -335,44 +335,35 @@ export default function ResearchPage() {
       {/* 분야 트렌드 (네이버 쇼핑인사이트) — 대분류 전체 한눈에 */}
       <Card>
         <CardContent className="p-5">
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-1 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <span className="font-bold">분야 트렌드</span>
-            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류</span>
+            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류 · 기간별 변화율</span>
           </div>
-          <div className="mb-3 grid grid-cols-3 gap-1.5">
-            {[3, 6, 12].map((m) => (
-              <button
-                key={m}
-                onClick={() => setInsightMonths(m)}
-                className={cn(
-                  "rounded-lg border py-1.5 text-sm font-semibold transition-colors",
-                  insightMonths === m
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border/60 text-muted-foreground hover:bg-accent"
-                )}
-              >
-                {m}개월
-              </button>
-            ))}
-          </div>
-          {insight.isLoading && <p className="text-sm text-muted-foreground">조회 중…</p>}
+          {insight.isLoading && <p className="mt-2 text-sm text-muted-foreground">조회 중…</p>}
           {insight.error && (
-            <p className="text-xs text-muted-foreground">쇼핑인사이트 미연동 · NCP 키 확인</p>
+            <p className="mt-2 text-xs text-muted-foreground">쇼핑인사이트 미연동 · NCP 키 확인</p>
           )}
           {insight.data && insight.data.length > 0 && (
-            <div className="divide-y divide-border/40">
-              {[...insight.data]
-                .sort((a, b) => (b.changePct ?? -999) - (a.changePct ?? -999))
-                .map((c) => (
-                  <div key={c.cid} className="flex items-center justify-between gap-2 py-2">
-                    <span className="text-sm font-medium">{c.name}</span>
-                    <div className="flex items-center gap-2">
-                      {c.series.length > 3 && <Sparkline data={c.series} dir={c.direction} />}
-                      <TrendBadge dir={c.direction} pct={c.changePct} />
+            <div className="mt-2">
+              <div className="grid grid-cols-[1fr_3.2rem_3.2rem_3.2rem] items-center gap-1 pb-1 text-[11px] font-medium text-muted-foreground">
+                <span>분야</span>
+                <span className="text-right">3개월</span>
+                <span className="text-right">6개월</span>
+                <span className="text-right">12개월</span>
+              </div>
+              <div className="divide-y divide-border/40">
+                {[...insight.data]
+                  .sort((a, b) => (b.p3.changePct ?? -999) - (a.p3.changePct ?? -999))
+                  .map((c) => (
+                    <div key={c.cid} className="grid grid-cols-[1fr_3.2rem_3.2rem_3.2rem] items-center gap-1 py-2">
+                      <span className="truncate text-sm font-medium">{c.name}</span>
+                      <PctCell v={c.p3} />
+                      <PctCell v={c.p6} />
+                      <PctCell v={c.p12} />
                     </div>
-                  </div>
-                ))}
+                  ))}
+              </div>
             </div>
           )}
         </CardContent>
@@ -715,6 +706,13 @@ function TrendBadge({ dir, pct }: { dir: "up" | "flat" | "down"; pct: number | n
       <Minus className="h-3.5 w-3.5" /> 보합
     </Badge>
   );
+}
+
+function PctCell({ v }: { v: Pt }) {
+  const color =
+    v.direction === "up" ? "text-emerald-600" : v.direction === "down" ? "text-red-600" : "text-muted-foreground";
+  const txt = v.changePct == null ? "–" : `${v.changePct > 0 ? "+" : ""}${v.changePct}%`;
+  return <span className={`text-right text-sm font-bold tabular-nums ${color}`}>{txt}</span>;
 }
 
 function Sparkline({ data, dir }: { data: number[]; dir: "up" | "flat" | "down" }) {
