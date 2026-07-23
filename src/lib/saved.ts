@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Brief } from "@/components/brief-view";
 
 /** 상품찾기에서 "아이템 저장"한 후보 (Neon DB 저장 → 기기 간 동기화). */
 export type SavedItem = {
@@ -11,6 +12,7 @@ export type SavedItem = {
   caution?: string | null;
   monthlyVolume?: number | null;
   comp?: string | null;
+  brief?: Brief | null;
 };
 
 const KEY = ["saved"] as const;
@@ -61,6 +63,8 @@ export function useSaved() {
   const has = (keyword: string) => data.some((x) => x.keyword === keyword);
   const toggle = (item: SavedItem) => (has(item.keyword) ? removeM.mutate(item.keyword) : addM.mutate(item));
   const remove = (keyword: string) => removeM.mutate(keyword);
+  // 이미 저장된 항목에 필드(예: brief) 덧붙이기(upsert, toggle 아님)
+  const save = (item: SavedItem) => addM.mutate(item);
 
-  return { items: data, has, toggle, remove };
+  return { items: data, has, toggle, remove, save };
 }

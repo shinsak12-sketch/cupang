@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { won, cn } from "@/lib/utils";
 import { usePersistentState } from "@/lib/persist";
 import { useSaved } from "@/lib/saved";
+import { BriefView, parseBrief, type Brief } from "@/components/brief-view";
 
 type KwRow = { keyword: string; pc: number; mobile: number; total: number; comp: string };
 type Estimate = {
@@ -74,18 +75,6 @@ type Reco = {
 };
 type DiscoverResult = { ask: string; recommendations: Reco[]; note: string };
 type Pt = { direction: "up" | "flat" | "down"; changePct: number | null };
-type Brief = {
-  keyword: string;
-  verdict: "GO" | "조건부" | "SKIP";
-  demand?: string;
-  buyerNeed?: string;
-  painPoints?: string[];
-  differentiation?: string[];
-  competition?: string;
-  risk?: string;
-  margin?: string;
-  howToWin?: string;
-};
 
 const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo"; ring: string }> = {
   GOOD: { label: "추천", variant: "go", ring: "border-emerald-400/50 bg-emerald-50/50 dark:bg-emerald-950/20" },
@@ -124,8 +113,9 @@ export default function ResearchPage() {
     },
   });
 
-  const { items: saved, toggle } = useSaved();
+  const { items: saved, toggle, has: isSaved, save } = useSaved();
   const savedSet = new Set(saved.map((s) => s.keyword));
+  const sameKw = (a: string, b: string) => a.replace(/\s+/g, "").toLowerCase() === b.replace(/\s+/g, "").toLowerCase();
 
   const discover = useMutation({
     mutationFn: async (askText: string): Promise<DiscoverResult> => {
@@ -306,6 +296,8 @@ JSON:
       const b = parseBrief(await file.text());
       if (!b) throw new Error("분석 결과(JSON)를 읽지 못했어요.");
       setBrief(b);
+      // 이미 저장된 키워드면 분석을 저장 항목에 붙여줌
+      if (isSaved(b.keyword)) save({ keyword: b.keyword, brief: b });
     } catch (e) {
       setBriefErr(e instanceof Error ? e.message : "파일을 읽지 못했어요.");
     }
@@ -519,7 +511,14 @@ JSON:
               />
               <ActBtn onClick={() => router.push(`/calc?name=${encodeURIComponent(query)}`)} icon={Calculator} label="마진계산" />
               <ActBtn
-                onClick={() => toggle({ keyword: query, monthlyVolume: exact?.total ?? null, comp: exact?.comp ?? null })}
+                onClick={() =>
+                  toggle({
+                    keyword: query,
+                    monthlyVolume: exact?.total ?? null,
+                    comp: exact?.comp ?? null,
+                    brief: brief && sameKw(brief.keyword, query) ? brief : null,
+                  })
+                }
                 icon={savedSet.has(query) ? BookmarkCheck : Bookmark}
                 label={savedSet.has(query) ? "저장됨" : "저장"}
                 active={savedSet.has(query)}
@@ -665,90 +664,14 @@ JSON:
               </label>
             </div>
             {briefErr && <p className="mt-2 text-xs text-destructive">{briefErr}</p>}
-            {brief && <BriefView b={brief} />}
+            {brief && (
+              <div className="mt-4">
+                <BriefView b={brief} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function parseBrief(text: string): Brief | null {
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fence ? fence[1] : text;
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start < 0 || end < 0) return null;
-  const o = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
-  const kw = typeof o.keyword === "string" ? o.keyword : "";
-  if (!kw) return null;
-  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined);
-  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-  const verdict = o.verdict === "GO" || o.verdict === "조건부" || o.verdict === "SKIP" ? o.verdict : "조건부";
-  return {
-    keyword: kw,
-    verdict: verdict as Brief["verdict"],
-    demand: str(o.demand),
-    buyerNeed: str(o.buyerNeed),
-    painPoints: arr(o.painPoints),
-    differentiation: arr(o.differentiation),
-    competition: str(o.competition),
-    risk: str(o.risk),
-    margin: str(o.margin),
-    howToWin: str(o.howToWin),
-  };
-}
-
-function BriefView({ b }: { b: Brief }) {
-  const v =
-    b.verdict === "GO"
-      ? { label: "GO 추천", variant: "go" as const }
-      : b.verdict === "SKIP"
-        ? { label: "SKIP", variant: "nogo" as const }
-        : { label: "조건부", variant: "caution" as const };
-  return (
-    <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-bold">{b.keyword}</span>
-        <Badge variant={v.variant}>{v.label}</Badge>
-      </div>
-      {b.howToWin && (
-        <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-          💡 {b.howToWin}
-        </div>
-      )}
-      {b.buyerNeed && <BriefRow label="구매 욕구" text={b.buyerNeed} />}
-      {b.painPoints && b.painPoints.length > 0 && <BriefList label="미충족 니즈" items={b.painPoints} />}
-      {b.differentiation && b.differentiation.length > 0 && <BriefList label="차별화 각도" items={b.differentiation} />}
-      {b.demand && <BriefRow label="수요" text={b.demand} />}
-      {b.competition && <BriefRow label="진입 난이도" text={b.competition} />}
-      {b.margin && <BriefRow label="마진" text={b.margin} />}
-      {b.risk && <BriefRow label="리스크" text={b.risk} />}
-    </div>
-  );
-}
-
-function BriefRow({ label, text }: { label: string; text: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="text-sm">{text}</p>
-    </div>
-  );
-}
-
-function BriefList({ label, items }: { label: string; items: string[] }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <ul className="mt-0.5 space-y-0.5 text-sm">
-        {items.map((it, i) => (
-          <li key={i} className="flex gap-1.5">
-            <span className="text-primary">·</span>
-            <span>{it}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

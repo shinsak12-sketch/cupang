@@ -364,6 +364,7 @@ export const savedItem = pgTable(
     caution: text("caution"),
     monthlyVolume: integer("monthly_volume"),
     comp: text("comp"),
+    brief: text("brief"), // AI 기회분석 결과(JSON 문자열)
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 저장 리스트 조회 (최신순). */
+/** 저장 리스트 조회 (최신순). brief(JSON 문자열)는 객체로 파싱해 반환. */
 export async function GET() {
   try {
     const rows = await db.select().from(schema.savedItem).orderBy(desc(schema.savedItem.createdAt));
-    return NextResponse.json({ items: rows });
+    const items = rows.map((r) => {
+      let brief: unknown = null;
+      if (r.brief) {
+        try {
+          brief = JSON.parse(r.brief);
+        } catch {
+          brief = null;
+        }
+      }
+      return { ...r, brief };
+    });
+    return NextResponse.json({ items });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }
 
-/** 저장 추가 (같은 키워드는 무시). */
+/** 저장 추가/갱신 (upsert). 기존 값은 유지하고 넘어온 값만 덮어씀(COALESCE). */
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown> = {};
   try {
@@ -28,6 +39,13 @@ export async function POST(req: NextRequest) {
 
   const s = (v: unknown) => (typeof v === "string" ? v : null);
   const num = (v: unknown) => (typeof v === "number" ? v : null);
+  const briefStr =
+    body.brief && typeof body.brief === "object"
+      ? JSON.stringify(body.brief)
+      : typeof body.brief === "string"
+        ? body.brief
+        : null;
+
   try {
     await db
       .insert(schema.savedItem)
@@ -39,8 +57,20 @@ export async function POST(req: NextRequest) {
         caution: s(body.caution),
         monthlyVolume: num(body.monthlyVolume),
         comp: s(body.comp),
+        brief: briefStr,
       })
-      .onConflictDoNothing({ target: schema.savedItem.keyword });
+      .onConflictDoUpdate({
+        target: schema.savedItem.keyword,
+        set: {
+          verdict: sql`COALESCE(excluded.verdict, ${schema.savedItem.verdict})`,
+          margin: sql`COALESCE(excluded.margin, ${schema.savedItem.margin})`,
+          reason: sql`COALESCE(excluded.reason, ${schema.savedItem.reason})`,
+          caution: sql`COALESCE(excluded.caution, ${schema.savedItem.caution})`,
+          monthlyVolume: sql`COALESCE(excluded.monthly_volume, ${schema.savedItem.monthlyVolume})`,
+          comp: sql`COALESCE(excluded.comp, ${schema.savedItem.comp})`,
+          brief: sql`COALESCE(excluded.brief, ${schema.savedItem.brief})`,
+        },
+      });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
