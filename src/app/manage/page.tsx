@@ -17,7 +17,13 @@ type Product = {
   salePrice: number | null;
   marginAfterAd: number | null;
 };
-type Sale = { id: number; ym: string; soldQty: number | null; returnedQty: number | null };
+type Sale = {
+  id: number;
+  ym: string;
+  soldQty: number | null;
+  returnedQty: number | null;
+  settlementAmount: string | null;
+};
 
 const thisYm = () => new Date().toISOString().slice(0, 7);
 
@@ -75,6 +81,7 @@ function ManageCard({ product }: { product: Product }) {
   const [ym, setYm] = useState(thisYm());
   const [qty, setQty] = useState("");
   const [returned, setReturned] = useState("");
+  const [actual, setActual] = useState("");
 
   const { data } = useQuery({
     queryKey: ["sales", product.id],
@@ -91,6 +98,7 @@ function ManageCard({ product }: { product: Product }) {
     onSuccess: () => {
       setQty("");
       setReturned("");
+      setActual("");
       qc.invalidateQueries({ queryKey: ["sales", product.id] });
       qc.invalidateQueries({ queryKey: ["stats"] });
     },
@@ -105,8 +113,14 @@ function ManageCard({ product }: { product: Product }) {
 
   const unit = product.marginAfterAd ?? 0;
   const sales = data ?? [];
-  const totalQty = sales.reduce((s, x) => s + (x.soldQty ?? 0), 0);
-  const totalMargin = totalQty * unit;
+  const net = (x: Sale) => (x.soldQty ?? 0) - (x.returnedQty ?? 0); // 순판매
+  const totalNetQty = sales.reduce((s, x) => s + net(x), 0);
+  const totalEst = totalNetQty * unit;
+  const actualRows = sales.filter((x) => x.settlementAmount != null);
+  const totalActual = actualRows.reduce((s, x) => s + Number(x.settlementAmount), 0);
+  const estForActual = actualRows.reduce((s, x) => s + net(x) * unit, 0);
+  const diff = totalActual - estForActual;
+  const hasActual = actualRows.length > 0;
 
   return (
     <Card>
@@ -138,35 +152,74 @@ function ManageCard({ product }: { product: Product }) {
                 <span className="mb-1 block text-xs text-muted-foreground">반품</span>
                 <Input value={returned} onChange={(e) => setReturned(e.target.value)} inputMode="numeric" placeholder="0" className="h-10 w-20" />
               </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs text-muted-foreground">실제 순이익(선택)</span>
+                <Input value={actual} onChange={(e) => setActual(e.target.value)} inputMode="numeric" placeholder="원" className="h-10 w-28" />
+              </label>
               <Button
                 size="sm"
                 className="h-10"
                 disabled={!qty}
-                onClick={() => save.mutate({ productId: product.id, ym, soldQty: Number(qty) || 0, returnedQty: Number(returned) || 0 })}
+                onClick={() =>
+                  save.mutate({
+                    productId: product.id,
+                    ym,
+                    soldQty: Number(qty) || 0,
+                    returnedQty: Number(returned) || 0,
+                    settlementAmount: actual ? Number(actual.replace(/[,\s]/g, "")) : null,
+                  })
+                }
               >
                 <Plus className="h-4 w-4" /> 저장
               </Button>
             </div>
 
             {/* 누적 */}
-            <div className="flex items-center justify-between rounded-xl bg-primary/5 px-4 py-3">
-              <span className="text-sm font-medium">누적 {totalQty.toLocaleString("ko-KR")}개</span>
-              <span className="font-extrabold tabular-nums">추정 마진 {won(totalMargin)}</span>
+            <div className="space-y-1 rounded-xl bg-primary/5 px-4 py-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">순판매 {totalNetQty.toLocaleString("ko-KR")}개</span>
+                <span className="font-extrabold tabular-nums">추정 마진 {won(totalEst)}</span>
+              </div>
+              {hasActual && (
+                <div className="flex items-center justify-between border-t border-border/60 pt-1 text-sm">
+                  <span className="font-medium">실제 순이익 {won(totalActual)}</span>
+                  <span className={`font-bold tabular-nums ${diff >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {diff >= 0 ? "+" : ""}
+                    {won(diff)} vs 추정
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 월별 목록 */}
             <div className="space-y-1.5">
-              {sales.map((s) => (
-                <div key={s.id} className="flex items-center gap-2 text-sm">
-                  <span className="w-20 font-mono">{s.ym}</span>
-                  <span className="flex-1 text-muted-foreground">
-                    판매 {s.soldQty ?? 0}개{s.returnedQty ? ` · 반품 ${s.returnedQty}` : ""} · {won((s.soldQty ?? 0) * unit)}
-                  </span>
-                  <button onClick={() => del.mutate(s.id)} className="text-muted-foreground">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+              {sales.map((s) => {
+                const a = s.settlementAmount != null ? Number(s.settlementAmount) : null;
+                const est = net(s) * unit;
+                return (
+                  <div key={s.id} className="flex items-center gap-2 text-sm">
+                    <span className="w-20 font-mono">{s.ym}</span>
+                    <span className="flex-1 text-muted-foreground">
+                      판매 {s.soldQty ?? 0}
+                      {s.returnedQty ? ` · 반품 ${s.returnedQty}` : ""} · 추정 {won(est)}
+                      {a != null && (
+                        <>
+                          {" · "}
+                          <b className="text-foreground">실제 {won(a)}</b>
+                          <span className={a - est >= 0 ? "text-emerald-600" : "text-red-600"}>
+                            {" "}
+                            ({a - est >= 0 ? "+" : ""}
+                            {won(a - est)})
+                          </span>
+                        </>
+                      )}
+                    </span>
+                    <button onClick={() => del.mutate(s.id)} className="text-muted-foreground">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
               {sales.length === 0 && <p className="text-xs text-muted-foreground">아직 입력된 월이 없어요.</p>}
             </div>
           </div>

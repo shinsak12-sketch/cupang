@@ -24,6 +24,7 @@ const postSchema = z.object({
   soldQty: z.number().int().nonnegative(),
   returnedQty: z.number().int().nonnegative().default(0),
   grossRevenue: z.number().nonnegative().nullable().optional(),
+  settlementAmount: z.number().nullable().optional(), // 실제 순이익(월)
 });
 
 // POST — (productId, ym) 기준 upsert
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
         soldQty: d.soldQty,
         returnedQty: d.returnedQty,
         grossRevenue: d.grossRevenue != null ? String(d.grossRevenue) : null,
+        settlementAmount: d.settlementAmount != null ? String(d.settlementAmount) : null,
       })
       .where(eq(schema.salesActual.id, existing.id));
   } else {
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
       soldQty: d.soldQty,
       returnedQty: d.returnedQty,
       grossRevenue: d.grossRevenue != null ? String(d.grossRevenue) : null,
+      settlementAmount: d.settlementAmount != null ? String(d.settlementAmount) : null,
     });
   }
   return NextResponse.json({ ok: true });
