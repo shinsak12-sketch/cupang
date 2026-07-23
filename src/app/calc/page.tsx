@@ -90,6 +90,9 @@ export default function CalcPage() {
   const [sizeType, setSizeType] = usePersistentState("calc.sizeType", "");
   const [inboundShip, setInboundShip] = usePersistentState("calc.inboundShip", "");
   const [adCost, setAdCost] = usePersistentState("calc.adCost", "");
+  // 반품 (실마진 반영)
+  const [returnRatePct, setReturnRatePct] = usePersistentState("calc.returnRatePct", "3");
+  const [returnResalable, setReturnResalable] = usePersistentState("calc.returnResalable", true);
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -120,6 +123,8 @@ export default function CalcPage() {
     setSizeType("");
     setInboundShip("");
     setAdCost("");
+    setReturnRatePct("3");
+    setReturnResalable(true);
     setEditingId(null);
     setMsg(null);
   }
@@ -159,6 +164,8 @@ export default function CalcPage() {
       setSizeType(inp.sizeType ?? "");
       setInboundShip(s(inp.inboundShip));
       setAdCost(s(inp.adCost));
+      if (inp.returnRatePct != null) setReturnRatePct(String(inp.returnRatePct));
+      if (inp.returnResalable != null) setReturnResalable(!!inp.returnResalable);
     })();
   }, []);
 
@@ -224,6 +231,9 @@ export default function CalcPage() {
   const baseCostKrw =
     sourcing === "overseas" ? Math.round(n(costCny) * effRate) : n(costKrw);
 
+  // 반품 1건당 손실 = 반품물류비(≈입출고비) + (재판매 불가 시 착지원가)
+  const returnLossPerReturn = n(inboundShip) + (returnResalable ? 0 : landedCost);
+
   const result = useMemo(
     () =>
       calcSimpleMargin({
@@ -232,8 +242,10 @@ export default function CalcPage() {
         inboundShipFee: n(inboundShip),
         commissionPct: n(commission),
         adCost: n(adCost),
+        returnRatePct: n(returnRatePct),
+        returnLossPerReturn,
       }),
-    [salePrice, landedCost, inboundShip, commission, adCost]
+    [salePrice, landedCost, inboundShip, commission, adCost, returnRatePct, returnLossPerReturn]
   );
 
   async function save() {
@@ -268,6 +280,8 @@ export default function CalcPage() {
           sizeType,
           inboundShip: n(inboundShip),
           adCost: n(adCost),
+          returnRatePct: n(returnRatePct),
+          returnResalable,
           major,
           middle,
         },
@@ -559,21 +573,57 @@ export default function CalcPage() {
         </CardContent>
       </Card>
 
+      {/* 3. 반품 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">③ 반품 (실마진 반영)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="반품률 %">
+              <Input value={returnRatePct} onChange={(e) => setReturnRatePct(e.target.value)} inputMode="decimal" placeholder="3" />
+            </Field>
+            <Field label="반품 상품 재판매">
+              <div className="grid grid-cols-2 gap-2">
+                <Toggle active={returnResalable} onClick={() => setReturnResalable(true)}>
+                  가능
+                </Toggle>
+                <Toggle active={!returnResalable} onClick={() => setReturnResalable(false)}>
+                  불가(폐기)
+                </Toggle>
+              </div>
+            </Field>
+          </div>
+          <div className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+            <BreakRow label="반품 1건 손실" value={won(returnLossPerReturn)} />
+            <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1.5 font-bold">
+              <span>반품비용 ({n(returnRatePct) || 0}% 반영)</span>
+              <span className="tabular-nums text-red-600">-{won(result.returnCost)}</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            반품물류비 ≈ 입출고비 기준 추정. <b>재판매 불가</b>면 착지원가까지 손실. 로켓그로스 반품률 보통 2~5%.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* 결과 */}
       <Card className="border-2 border-primary/30 shadow-pop">
         <CardContent className="space-y-3 p-5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">최종 마진</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              실마진 <span className="text-xs">(광고·반품 반영)</span>
+            </span>
             <Badge variant={verdictVariant} className="text-sm">
               {result.verdict}
             </Badge>
           </div>
           <div className="flex items-end gap-3">
-            <span className={`text-4xl font-extrabold tabular-nums ${result.marginAfterAd < 0 ? "text-red-600" : ""}`}>
-              {won(result.marginAfterAd)}
+            <span className={`text-4xl font-extrabold tabular-nums ${result.marginAfterReturn < 0 ? "text-red-600" : ""}`}>
+              {won(result.marginAfterReturn)}
             </span>
             <span className="pb-1 text-lg font-bold text-muted-foreground">
-              {pct(result.marginRateAfterAd)}
+              {pct(result.marginRateAfterReturn)}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -581,8 +631,9 @@ export default function CalcPage() {
             <Line label="판매수수료" value={won(result.commission)} />
             <Line label="입출고비" value={won(result.inboundShipFee)} />
             <Line label="납부부가세" value={won(result.vatPayable)} />
-            {n(adCost) > 0 && <Line label="광고전마진" value={won(result.margin)} />}
-            {n(adCost) > 0 && <Line label="광고비" value={won(n(adCost))} />}
+            <Line label="장부상 마진" value={won(result.margin)} />
+            {n(adCost) > 0 && <Line label="광고비" value={`-${won(n(adCost))}`} />}
+            {result.returnCost > 0 && <Line label="반품비용" value={`-${won(result.returnCost)}`} />}
             <Line
               label="손익 ROAS"
               value={result.breakevenRoas > 0 ? `${result.breakevenRoas}배` : "-"}
