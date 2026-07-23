@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CategoryTrend } from "@/components/category-trend";
 import { won } from "@/lib/utils";
 
 type Stats = {
@@ -159,6 +160,9 @@ export default function DashboardPage() {
         <StatTile label="판매중" value={data?.selling ?? 0} tone="go" href="/manage" />
         <StatTile label="폐기" value={data?.discarded ?? 0} tone="muted" href="/products" />
       </div>
+
+      {/* 분야 트렌드 (매일 안 바뀌어 홈에 상주) */}
+      <CategoryTrend />
 
       {/* 프로모션 D-day */}
       {data?.promo && (

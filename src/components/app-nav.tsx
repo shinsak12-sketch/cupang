@@ -6,9 +6,9 @@ import { Home, Search, Calculator, Package, ClipboardList, LayoutGrid } from "lu
 import { cn } from "@/lib/utils";
 
 const PRIMARY = [
-  { href: "/", label: "홈", icon: Home },
   { href: "/research", label: "찾기", icon: Search },
   { href: "/calc", label: "계산", icon: Calculator },
+  { href: "/", label: "홈", icon: Home },
   { href: "/products", label: "목록", icon: Package },
   { href: "/manage", label: "관리", icon: ClipboardList },
   { href: "/more", label: "더보기", icon: LayoutGrid },
@@ -63,6 +63,7 @@ export function BottomNav() {
         {PRIMARY.map((n) => {
           const active = isActive(pathname, n.href);
           const Icon = n.icon;
+          const isHome = n.href === "/";
           return (
             <Link
               key={n.href}
@@ -74,11 +75,13 @@ export function BottomNav() {
             >
               <span
                 className={cn(
-                  "grid h-8 w-11 place-items-center rounded-full transition-colors",
-                  active && "bg-accent"
+                  "grid place-items-center rounded-full transition-colors",
+                  isHome
+                    ? "h-11 w-11 -mt-4 border-4 border-background bg-primary text-primary-foreground shadow-pop"
+                    : cn("h-8 w-11", active && "bg-accent")
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                <Icon className="h-5 w-5" strokeWidth={isHome ? 2.5 : active ? 2.5 : 2} />
               </span>
               {n.label}
             </Link>
