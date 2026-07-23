@@ -74,6 +74,18 @@ type Reco = {
 };
 type DiscoverResult = { ask: string; recommendations: Reco[]; note: string };
 type Pt = { direction: "up" | "flat" | "down"; changePct: number | null };
+type Brief = {
+  keyword: string;
+  verdict: "GO" | "조건부" | "SKIP";
+  demand?: string;
+  buyerNeed?: string;
+  painPoints?: string[];
+  differentiation?: string[];
+  competition?: string;
+  risk?: string;
+  margin?: string;
+  howToWin?: string;
+};
 
 const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo"; ring: string }> = {
   GOOD: { label: "추천", variant: "go", ring: "border-emerald-400/50 bg-emerald-50/50 dark:bg-emerald-950/20" },
@@ -234,6 +246,68 @@ export default function ResearchPage() {
 
   const exact = naver.data?.rows.find((r) => r.keyword.replace(/\s+/g, "") === query.replace(/\s+/g, "")) ?? naver.data?.rows[0];
   const related = (naver.data?.rows ?? []).filter((r) => r !== exact).slice(0, 20);
+
+  // AI 기회분석 (무료 파일 방식)
+  const [brief, setBrief] = usePersistentState<Brief | null>("research.brief", null);
+  const [briefErr, setBriefErr] = useState("");
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+  function buildAnalysisPrompt(): string {
+    const lines: string[] = [`[키워드] ${query}`];
+    if (exact)
+      lines.push(
+        `[네이버 검색량] 월 ${exact.total.toLocaleString("ko-KR")} (PC ${exact.pc.toLocaleString("ko-KR")} / 모바일 ${exact.mobile.toLocaleString("ko-KR")}), 경쟁 ${exact.comp}`
+      );
+    if (trend.data && trend.data.series.length > 3) {
+      const d = trend.data.direction === "up" ? "상승" : trend.data.direction === "down" ? "하락" : "보합";
+      lines.push(
+        `[검색어트렌드] 최근 12개월 ${d}${trend.data.changePct != null ? ` ${trend.data.changePct > 0 ? "+" : ""}${trend.data.changePct}%` : ""}`
+      );
+    }
+    const s = coupang.data?.summary;
+    if (s)
+      lines.push(
+        `[쿠팡 경쟁] 상품 ${s.count}개 / 최다리뷰 ${s.maxReview.toLocaleString("ko-KR")} / 가격대 ${won(s.priceMin)}~${won(s.priceMax)} / PB ${s.pbCount}개 / 로켓 ${s.rocketCount}개`
+      );
+    else lines.push(`[쿠팡 경쟁] 수집 데이터 없음 (북마클릿 미수집)`);
+
+    return `너는 1688(중국 도매)→쿠팡 로켓그로스 소싱 전문가야. 아래 데이터로 이 상품의 "기회 분석"을 구매자·셀러 관점에서 냉정하게 해줘. 반드시 한국어, 아래 JSON만 출력(설명·코드펜스 금지).
+
+${lines.join("\n")}
+
+분석 관점:
+- 왜 사는가(구매자 JTBD)와 핵심 구매욕구
+- 기존 상품의 미충족 니즈(별점 낮은 리뷰에서 나올 법한 불만 가설)
+- 1688 소싱 셀러의 차별화 각도(세트/기능/타겟/구성으로 객단가↑)
+- 진입 난이도(리뷰 장벽, 쿠팡 PB, 가격경쟁)
+- 리스크(반품 위생·사이즈·파손, 시즌 절벽)
+- 마진 가능성(저단가면 물류비 비중 큼)
+- 최종 판정(GO/조건부/SKIP)과 이기는 법
+
+JSON:
+{"keyword":"${query}","verdict":"GO|조건부|SKIP","demand":"수요 한 줄","buyerNeed":"핵심 구매욕구","painPoints":["미충족 니즈1","2"],"differentiation":["차별화 각도1","2"],"competition":"진입 난이도","risk":"리스크","margin":"마진 가능성","howToWin":"이기는 법 한 줄"}`;
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(buildAnalysisPrompt());
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 1500);
+    } catch {
+      setBriefErr("복사 실패 — 브라우저 권한 확인");
+    }
+  }
+
+  async function onBriefFile(file: File) {
+    setBriefErr("");
+    try {
+      const b = parseBrief(await file.text());
+      if (!b) throw new Error("분석 결과(JSON)를 읽지 못했어요.");
+      setBrief(b);
+    } catch (e) {
+      setBriefErr(e instanceof Error ? e.message : "파일을 읽지 못했어요.");
+    }
+  }
 
   const cardProps = { onPick: runKeyword, onCalc: goCalc, onSave: saveItem, savedSet };
 
@@ -553,6 +627,126 @@ export default function ResearchPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* AI 기회분석 (무료 파일 방식) */}
+      {query && (
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-accent to-transparent shadow-pop">
+          <CardContent className="p-5">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-bold">AI 기회분석</span>
+              <span className="text-xs text-muted-foreground">구매자·셀러 관점 종합 판정</span>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              데이터 복사 → 클로드 채팅에 붙여 분석받고 → 결과(.json) 업로드. (API 비용 0원)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={copyPrompt}
+                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground active:scale-[0.98]"
+              >
+                {copiedPrompt ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copiedPrompt ? "복사됨!" : "분석 데이터 복사"}
+              </button>
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-semibold hover:bg-accent">
+                <Upload className="h-4 w-4" /> 결과 업로드
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onBriefFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {briefErr && <p className="mt-2 text-xs text-destructive">{briefErr}</p>}
+            {brief && <BriefView b={brief} />}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function parseBrief(text: string): Brief | null {
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fence ? fence[1] : text;
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end < 0) return null;
+  const o = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+  const kw = typeof o.keyword === "string" ? o.keyword : "";
+  if (!kw) return null;
+  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined);
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const verdict = o.verdict === "GO" || o.verdict === "조건부" || o.verdict === "SKIP" ? o.verdict : "조건부";
+  return {
+    keyword: kw,
+    verdict: verdict as Brief["verdict"],
+    demand: str(o.demand),
+    buyerNeed: str(o.buyerNeed),
+    painPoints: arr(o.painPoints),
+    differentiation: arr(o.differentiation),
+    competition: str(o.competition),
+    risk: str(o.risk),
+    margin: str(o.margin),
+    howToWin: str(o.howToWin),
+  };
+}
+
+function BriefView({ b }: { b: Brief }) {
+  const v =
+    b.verdict === "GO"
+      ? { label: "GO 추천", variant: "go" as const }
+      : b.verdict === "SKIP"
+        ? { label: "SKIP", variant: "nogo" as const }
+        : { label: "조건부", variant: "caution" as const };
+  return (
+    <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold">{b.keyword}</span>
+        <Badge variant={v.variant}>{v.label}</Badge>
+      </div>
+      {b.howToWin && (
+        <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+          💡 {b.howToWin}
+        </div>
+      )}
+      {b.buyerNeed && <BriefRow label="구매 욕구" text={b.buyerNeed} />}
+      {b.painPoints && b.painPoints.length > 0 && <BriefList label="미충족 니즈" items={b.painPoints} />}
+      {b.differentiation && b.differentiation.length > 0 && <BriefList label="차별화 각도" items={b.differentiation} />}
+      {b.demand && <BriefRow label="수요" text={b.demand} />}
+      {b.competition && <BriefRow label="진입 난이도" text={b.competition} />}
+      {b.margin && <BriefRow label="마진" text={b.margin} />}
+      {b.risk && <BriefRow label="리스크" text={b.risk} />}
+    </div>
+  );
+}
+
+function BriefRow({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="text-sm">{text}</p>
+    </div>
+  );
+}
+
+function BriefList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <ul className="mt-0.5 space-y-0.5 text-sm">
+        {items.map((it, i) => (
+          <li key={i} className="flex gap-1.5">
+            <span className="text-primary">·</span>
+            <span>{it}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
