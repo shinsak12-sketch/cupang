@@ -285,7 +285,9 @@ ${lines.join("\n")}
 - 최종 판정(GO/조건부/SKIP)과 이기는 법
 
 JSON:
-{"keyword":"${query}","verdict":"GO|조건부|SKIP","demand":"수요 한 줄","buyerNeed":"핵심 구매욕구","painPoints":["미충족 니즈1","2"],"differentiation":["차별화 각도1","2"],"competition":"진입 난이도","risk":"리스크","margin":"마진 가능성","howToWin":"이기는 법 한 줄"}`;
+{"keyword":"${query}","verdict":"GO|조건부|SKIP","demand":"수요 한 줄","buyerNeed":"핵심 구매욕구","painPoints":["미충족 니즈1","2"],"differentiation":["차별화 각도1","2"],"competition":"진입 난이도","risk":"리스크","margin":"마진 가능성","howToWin":"이기는 법 한 줄"}
+
+위 JSON을 '${query}-분석.json' 파일로 저장해서 줘. (파일 안엔 JSON만, 설명·코드펜스 금지)`;
   }
 
   async function copyPrompt() {

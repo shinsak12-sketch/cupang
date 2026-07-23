@@ -58,7 +58,10 @@ anchors.forEach(function(a){
 });
 if(items.length===0){alert('상품을 못 찾았어요.\\n· 쿠팡 앱이 아니라 브라우저인지\\n· 검색 결과 화면인지 확인 후 다시 눌러주세요.');return;}
 fetch(b+'/api/coupang-research?token='+t,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:kw,items:items})}).then(function(r){return r.json();}).then(function(d){alert('저장 완료: "'+kw+'" '+(d.saved||items.length)+'개 수집');}).catch(function(e){alert('수집 실패('+e+'). 잠시 후 재시도하세요.');});
-})();`.replace(/\n/g, "");
+})();`
+    .replace(/\n/g, "")
+    .replace(/ /g, "%20") // 삼성 인터넷: URL 공백 불가 → 인코딩(실행 시 브라우저가 복원)
+    .replace(/#/g, "%23"); // # 는 URL 프래그먼트로 잘리므로 인코딩
 
   return (
     <div className="max-w-2xl space-y-5">
