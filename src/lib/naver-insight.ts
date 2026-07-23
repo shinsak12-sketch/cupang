@@ -39,16 +39,17 @@ function direction(series: number[]): Trend {
   return { direction: dir, changePct, series };
 }
 
-/** 대분류 전체의 12개월 추이 (요청당 최대 3개 → 배치 병렬). */
-export async function allCategoryTrends(): Promise<CategoryTrend[]> {
+/** 대분류 전체 추이 (요청당 최대 3개 → 배치 병렬). months: 3|6|12 */
+export async function allCategoryTrends(months = 12): Promise<CategoryTrend[]> {
   const id = process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return [];
 
+  const timeUnit = months >= 12 ? "month" : "week"; // 짧으면 주간(점 촘촘)
   const end = new Date();
   const start = new Date(end);
-  start.setMonth(start.getMonth() - 11);
-  start.setDate(1);
+  start.setMonth(start.getMonth() - months);
+  if (timeUnit === "month") start.setDate(1);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
   const batches: { name: string; cid: string }[][] = [];
@@ -65,7 +66,7 @@ export async function allCategoryTrends(): Promise<CategoryTrend[]> {
       body: JSON.stringify({
         startDate: fmt(start),
         endDate: fmt(end),
-        timeUnit: "month",
+        timeUnit,
         category: batch.map((c) => ({ name: c.name, param: [c.cid] })),
       }),
     });

@@ -92,12 +92,14 @@ export default function ResearchPage() {
   );
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
+  const [insightMonths, setInsightMonths] = usePersistentState("research.insightMonths", 12);
+
   const insight = useQuery({
-    queryKey: ["insight-all"],
+    queryKey: ["insight-all", insightMonths],
     staleTime: 6 * 3600_000,
     retry: false,
     queryFn: async () => {
-      const r = await fetch(`/api/insight`);
+      const r = await fetch(`/api/insight?months=${insightMonths}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "쇼핑인사이트 실패");
       return (j.items ?? []) as {
@@ -336,7 +338,23 @@ export default function ResearchPage() {
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <span className="font-bold">분야 트렌드</span>
-            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류 12개월</span>
+            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류</span>
+          </div>
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            {[3, 6, 12].map((m) => (
+              <button
+                key={m}
+                onClick={() => setInsightMonths(m)}
+                className={cn(
+                  "rounded-lg border py-1.5 text-sm font-semibold transition-colors",
+                  insightMonths === m
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/60 text-muted-foreground hover:bg-accent"
+                )}
+              >
+                {m}개월
+              </button>
+            ))}
           </div>
           {insight.isLoading && <p className="text-sm text-muted-foreground">조회 중…</p>}
           {insight.error && (
