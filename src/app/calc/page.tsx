@@ -157,8 +157,10 @@ export default function CalcPage() {
     const p = new URLSearchParams(window.location.search);
     const nm = p.get("name");
     const link = p.get("link");
+    const sale = p.get("sale");
     if (nm) setName((prev) => prev || nm);
     if (link) setSourceUrl((prev) => prev || link);
+    if (sale && /^\d+$/.test(sale)) setSalePrice((prev) => prev || sale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
