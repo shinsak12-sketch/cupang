@@ -93,6 +93,10 @@ export default function CalcPage() {
   // 반품 (실마진 반영)
   const [returnRatePct, setReturnRatePct] = usePersistentState("calc.returnRatePct", "3");
   const [returnResalable, setReturnResalable] = usePersistentState("calc.returnResalable", true);
+  // 역산 도우미
+  const [revTargetRate, setRevTargetRate] = usePersistentState("calc.revTargetRate", "20");
+  const [revCompPrice, setRevCompPrice] = usePersistentState("calc.revCompPrice", "");
+  const [revTargetRate2, setRevTargetRate2] = usePersistentState("calc.revTargetRate2", "20");
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -247,6 +251,45 @@ export default function CalcPage() {
       }),
     [salePrice, landedCost, inboundShip, commission, adCost, returnRatePct, returnLossPerReturn]
   );
+
+  // 역산: 현재 수수료·입출고·반품 설정을 그대로 두고 판매가/착지원가를 이분탐색
+  const marginRateAt = (sp: number, ld: number) => {
+    const rl = n(inboundShip) + (returnResalable ? 0 : ld);
+    return calcSimpleMargin({
+      salePrice: sp,
+      landedCost: ld,
+      inboundShipFee: n(inboundShip),
+      commissionPct: n(commission),
+      adCost: n(adCost),
+      returnRatePct: n(returnRatePct),
+      returnLossPerReturn: rl,
+    }).marginRateAfterReturn;
+  };
+  const bisectPrice = (target: number): number | null => {
+    let lo = Math.max(100, landedCost);
+    let hi = Math.max(lo * 20, 2_000_000);
+    if (marginRateAt(hi, landedCost) < target) return null;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (marginRateAt(mid, landedCost) < target) lo = mid;
+      else hi = mid;
+    }
+    return Math.ceil(hi / 10) * 10;
+  };
+  const bisectLanded = (price: number, target: number): number | null => {
+    if (price <= 0) return null;
+    if (marginRateAt(price, 0) < target) return null; // 공짜 사입해도 목표 미달
+    let lo = 0;
+    let hi = price;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (marginRateAt(price, mid) >= target) lo = mid;
+      else hi = mid;
+    }
+    return Math.floor(lo / 10) * 10;
+  };
+  const revPrice = landedCost > 0 && n(revTargetRate) > 0 ? bisectPrice(n(revTargetRate)) : null;
+  const revMaxLanded = n(revCompPrice) > 0 && n(revTargetRate2) > 0 ? bisectLanded(n(revCompPrice), n(revTargetRate2)) : null;
 
   async function save() {
     if (!name) {
@@ -644,6 +687,60 @@ export default function CalcPage() {
             <span>
               광고하려면 <b className="whitespace-nowrap">ROAS {result.breakevenRoas || "-"}배</b> 넘어야 남아요.
             </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 역산 도우미 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">🔄 역산 도우미</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* 목표 마진율 → 필요 판매가 */}
+          <div>
+            <p className="mb-1 text-sm font-semibold">목표 마진율 → 필요 판매가</p>
+            <p className="mb-2 text-xs text-muted-foreground">현재 착지원가 {won(landedCost)} 기준</p>
+            <div className="flex items-center gap-2">
+              <Input
+                value={revTargetRate}
+                onChange={(e) => setRevTargetRate(e.target.value)}
+                inputMode="decimal"
+                placeholder="20"
+                className="w-20"
+              />
+              <span className="text-sm">% 남기려면 →</span>
+              <span className="text-lg font-extrabold tabular-nums">
+                {landedCost <= 0 ? "원가 먼저" : revPrice != null ? won(revPrice) : "불가"}
+              </span>
+              {revPrice != null && (
+                <Button size="sm" variant="outline" className="ml-auto" onClick={() => setSalePrice(String(revPrice))}>
+                  적용
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border/60" />
+
+          {/* 경쟁가 + 목표마진 → 착지원가 상한 */}
+          <div>
+            <p className="mb-1 text-sm font-semibold">경쟁가 → 사입 상한</p>
+            <p className="mb-2 text-xs text-muted-foreground">이 가격에 팔면서 목표마진 남기려면 착지원가는?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="경쟁 판매가">
+                <Input value={revCompPrice} onChange={(e) => setRevCompPrice(e.target.value)} inputMode="numeric" placeholder="9900" />
+              </Field>
+              <Field label="목표 마진율 %">
+                <Input value={revTargetRate2} onChange={(e) => setRevTargetRate2(e.target.value)} inputMode="decimal" placeholder="20" />
+              </Field>
+            </div>
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+              <span className="text-muted-foreground">→ 착지원가 이하로 사입</span>
+              <span className="text-lg font-extrabold tabular-nums text-primary">
+                {n(revCompPrice) <= 0 ? "-" : revMaxLanded != null ? `${won(revMaxLanded)} 이하` : "불가"}
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>
