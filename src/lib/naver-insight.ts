@@ -1,7 +1,7 @@
 /**
  * 네이버 쇼핑인사이트 — 분야(카테고리)별 클릭 추이 (NAVER API HUB).
  * 🔴 검색어트렌드와 같은 NCP 키 재사용: NAVER_CLIENT_ID / NAVER_CLIENT_SECRET.
- * 카테고리 12개월 클릭 추이로 "이 분야 뜨는 중/지는 중" 판단.
+ * 대분류 전체의 12개월 클릭 추이 → "뜨는 분야/지는 분야" 대시보드.
  * (연령/성별은 호출별 정규화 문제로 신뢰도 낮아 미제공.)
  */
 import type { Trend } from "@/lib/naver-datalab";
@@ -22,14 +22,28 @@ export const NAVER_CATEGORIES: { name: string; cid: string }[] = [
   { name: "여가/생활편의", cid: "50000009" },
 ];
 
+export type CategoryTrend = { name: string; cid: string } & Trend;
+
 export function insightConfigured(): boolean {
   return !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
 }
 
-export async function categoryTrend(cid: string, name: string): Promise<Trend | null> {
+function direction(series: number[]): Trend {
+  if (series.length < 4) return { direction: "flat", changePct: null, series };
+  const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
+  const first = avg(series.slice(0, 3));
+  const last = avg(series.slice(-3));
+  const changePct = first > 0 ? Math.round(((last - first) / first) * 100) : null;
+  const dir: Trend["direction"] =
+    changePct == null ? "flat" : changePct >= 15 ? "up" : changePct <= -15 ? "down" : "flat";
+  return { direction: dir, changePct, series };
+}
+
+/** 대분류 전체의 12개월 추이 (요청당 최대 3개 → 배치 병렬). */
+export async function allCategoryTrends(): Promise<CategoryTrend[]> {
   const id = process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_CLIENT_SECRET;
-  if (!id || !secret) return null;
+  if (!id || !secret) return [];
 
   const end = new Date();
   const start = new Date(end);
@@ -37,33 +51,41 @@ export async function categoryTrend(cid: string, name: string): Promise<Trend | 
   start.setDate(1);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
-  const r = await fetch(INSIGHT_URL, {
-    method: "POST",
-    headers: {
-      "X-NCP-APIGW-API-KEY-ID": id,
-      "X-NCP-APIGW-API-KEY": secret,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      startDate: fmt(start),
-      endDate: fmt(end),
-      timeUnit: "month",
-      category: [{ name, param: [cid] }],
-    }),
-  });
-  if (!r.ok) {
-    const body = await r.text().catch(() => "");
-    throw new Error(`쇼핑인사이트 오류 ${r.status}: ${body.slice(0, 160)}`);
-  }
-  const j = (await r.json()) as { results?: Array<{ data?: Array<{ ratio: number }> }> };
-  const series = (j.results?.[0]?.data ?? []).map((d) => d.ratio);
-  if (series.length < 4) return { direction: "flat", changePct: null, series };
+  const batches: { name: string; cid: string }[][] = [];
+  for (let i = 0; i < NAVER_CATEGORIES.length; i += 3) batches.push(NAVER_CATEGORIES.slice(i, i + 3));
 
-  const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
-  const first = avg(series.slice(0, 3));
-  const last = avg(series.slice(-3));
-  const changePct = first > 0 ? Math.round(((last - first) / first) * 100) : null;
-  const direction: Trend["direction"] =
-    changePct == null ? "flat" : changePct >= 15 ? "up" : changePct <= -15 ? "down" : "flat";
-  return { direction, changePct, series };
+  const reqs = batches.map(async (batch) => {
+    const r = await fetch(INSIGHT_URL, {
+      method: "POST",
+      headers: {
+        "X-NCP-APIGW-API-KEY-ID": id,
+        "X-NCP-APIGW-API-KEY": secret,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        startDate: fmt(start),
+        endDate: fmt(end),
+        timeUnit: "month",
+        category: batch.map((c) => ({ name: c.name, param: [c.cid] })),
+      }),
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      throw new Error(`쇼핑인사이트 오류 ${r.status}: ${body.slice(0, 160)}`);
+    }
+    const j = (await r.json()) as { results?: Array<{ data?: Array<{ ratio: number }> }> };
+    return (j.results ?? []).map((res, idx) => {
+      const cat = batch[idx];
+      const series = (res.data ?? []).map((d) => d.ratio);
+      return { name: cat.name, cid: cat.cid, ...direction(series) };
+    });
+  });
+
+  const settled = await Promise.allSettled(reqs);
+  const ok = settled.filter((s) => s.status === "fulfilled").flatMap((s) => (s as PromiseFulfilledResult<CategoryTrend[]>).value);
+  if (ok.length === 0) {
+    const firstErr = settled.find((s) => s.status === "rejected") as PromiseRejectedResult | undefined;
+    if (firstErr) throw firstErr.reason;
+  }
+  return ok;
 }

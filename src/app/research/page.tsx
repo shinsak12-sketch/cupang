@@ -80,19 +80,6 @@ const VERDICT: Record<string, { label: string; variant: "go" | "caution" | "nogo
   AVOID: { label: "비추천", variant: "nogo", ring: "border-red-300/40 opacity-80" },
 };
 
-const NAVER_CATS: { name: string; cid: string }[] = [
-  { name: "패션의류", cid: "50000000" },
-  { name: "패션잡화", cid: "50000001" },
-  { name: "화장품/미용", cid: "50000002" },
-  { name: "디지털/가전", cid: "50000003" },
-  { name: "가구/인테리어", cid: "50000004" },
-  { name: "출산/육아", cid: "50000005" },
-  { name: "식품", cid: "50000006" },
-  { name: "스포츠/레저", cid: "50000007" },
-  { name: "생활/건강", cid: "50000008" },
-  { name: "여가/생활편의", cid: "50000009" },
-];
-
 export default function ResearchPage() {
   const router = useRouter();
   const [input, setInput] = usePersistentState("research.input", "");
@@ -105,18 +92,21 @@ export default function ResearchPage() {
   );
   const [fileErr, setFileErr] = useState("");
   const [enriching, setEnriching] = useState(false);
-  const [insightCid, setInsightCid] = usePersistentState("research.insightCid", "");
-
   const insight = useQuery({
-    queryKey: ["insight", insightCid],
-    enabled: !!insightCid,
-    staleTime: 3600_000,
+    queryKey: ["insight-all"],
+    staleTime: 6 * 3600_000,
     retry: false,
     queryFn: async () => {
-      const r = await fetch(`/api/insight?cid=${insightCid}`);
+      const r = await fetch(`/api/insight`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "쇼핑인사이트 실패");
-      return j as { direction: "up" | "flat" | "down"; changePct: number | null; series: number[] };
+      return (j.items ?? []) as {
+        name: string;
+        cid: string;
+        direction: "up" | "flat" | "down";
+        changePct: number | null;
+        series: number[];
+      }[];
     },
   });
 
@@ -340,35 +330,31 @@ export default function ResearchPage() {
         </CardContent>
       </Card>
 
-      {/* 분야 트렌드 (네이버 쇼핑인사이트) */}
+      {/* 분야 트렌드 (네이버 쇼핑인사이트) — 대분류 전체 한눈에 */}
       <Card>
         <CardContent className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <span className="font-bold">분야 트렌드</span>
-            <span className="text-xs text-muted-foreground">네이버쇼핑 분야별 12개월</span>
+            <span className="text-xs text-muted-foreground">네이버쇼핑 대분류 12개월</span>
           </div>
-          <select
-            value={insightCid}
-            onChange={(e) => setInsightCid(e.target.value)}
-            className="h-11 w-full rounded-xl border-2 border-input bg-card px-3 text-base focus-visible:border-primary/50 focus-visible:outline-none"
-          >
-            <option value="">분야 선택</option>
-            {NAVER_CATS.map((c) => (
-              <option key={c.cid} value={c.cid}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {insight.isLoading && <p className="mt-2 text-sm text-muted-foreground">조회 중…</p>}
+          {insight.isLoading && <p className="text-sm text-muted-foreground">조회 중…</p>}
           {insight.error && (
-            <p className="mt-2 text-xs text-muted-foreground">쇼핑인사이트 미연동 · NCP 키 확인</p>
+            <p className="text-xs text-muted-foreground">쇼핑인사이트 미연동 · NCP 키 확인</p>
           )}
-          {insight.data && insight.data.series.length > 3 && (
-            <div className="mt-3 flex items-center gap-2">
-              <TrendBadge dir={insight.data.direction} pct={insight.data.changePct} />
-              <Sparkline data={insight.data.series} dir={insight.data.direction} />
-              <span className="text-xs text-muted-foreground">최근 12개월</span>
+          {insight.data && insight.data.length > 0 && (
+            <div className="divide-y divide-border/40">
+              {[...insight.data]
+                .sort((a, b) => (b.changePct ?? -999) - (a.changePct ?? -999))
+                .map((c) => (
+                  <div key={c.cid} className="flex items-center justify-between gap-2 py-2">
+                    <span className="text-sm font-medium">{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      {c.series.length > 3 && <Sparkline data={c.series} dir={c.direction} />}
+                      <TrendBadge dir={c.direction} pct={c.changePct} />
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </CardContent>
@@ -433,6 +419,25 @@ export default function ResearchPage() {
             {trend.data && trend.data.series.length <= 3 && (
               <p className="mt-2 text-xs text-muted-foreground">이 키워드는 데이터랩 추세 데이터가 부족해요.</p>
             )}
+
+            {/* 검색한 키워드 바로 액션 */}
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <ActBtn
+                onClick={() => {
+                  navigator.clipboard?.writeText(query).catch(() => {});
+                }}
+                icon={Copy}
+                label="이름복사"
+              />
+              <ActBtn onClick={() => router.push(`/calc?name=${encodeURIComponent(query)}`)} icon={Calculator} label="마진계산" />
+              <ActBtn
+                onClick={() => toggle({ keyword: query, monthlyVolume: exact?.total ?? null, comp: exact?.comp ?? null })}
+                icon={savedSet.has(query) ? BookmarkCheck : Bookmark}
+                label={savedSet.has(query) ? "저장됨" : "저장"}
+                active={savedSet.has(query)}
+              />
+            </div>
+
             {related.length > 0 && (
               <div className="mt-3">
                 <p className="mb-1 text-xs font-medium text-muted-foreground">연관 키워드</p>
