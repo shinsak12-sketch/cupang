@@ -4,7 +4,7 @@
  * env: NAVER_CLIENT_ID(=NCP Client ID), NAVER_CLIENT_SECRET(=NCP Client Secret)
  * 최근 12개월 상대 검색량 추이로 "수요가 오르는지/내리는지" 판단.
  */
-const NCP_DATALAB = "https://naveropenapi.apigw.ntruss.com/datalab/v1/search";
+const NCP_DATALAB = "https://naverapihub.apigw.ntruss.com/search-trend/v1/search";
 
 export function datalabConfigured(): boolean {
   return !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
