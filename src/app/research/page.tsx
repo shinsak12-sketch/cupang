@@ -10,7 +10,6 @@ import {
   TrendingDown,
   Minus,
   Store,
-  Tag,
   Sparkles,
   Upload,
   Copy,
@@ -214,25 +213,6 @@ export default function ResearchPage() {
     },
   });
 
-  const shop = useQuery({
-    queryKey: ["shop", query],
-    enabled: !!query,
-    staleTime: 3600_000,
-    retry: false,
-    queryFn: async () => {
-      const r = await fetch(`/api/shop?q=${encodeURIComponent(query)}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "쇼핑검색 실패");
-      return j as {
-        total: number;
-        min: number | null;
-        max: number | null;
-        median: number | null;
-        items: { title: string; price: number; mall: string; link: string }[];
-      };
-    },
-  });
-
   const exact = naver.data?.rows.find((r) => r.keyword.replace(/\s+/g, "") === query.replace(/\s+/g, "")) ?? naver.data?.rows[0];
   const related = (naver.data?.rows ?? []).filter((r) => r !== exact).slice(0, 20);
 
@@ -410,58 +390,6 @@ export default function ResearchPage() {
                   ))}
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 네이버쇼핑 시장가 */}
-      {query && (
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Tag className="h-4 w-4 text-primary" />
-              <span className="font-bold">네이버쇼핑 시장가</span>
-              <span className="text-xs text-muted-foreground">판매가 벤치마크</span>
-            </div>
-            {shop.isLoading && <p className="text-sm text-muted-foreground">조회 중…</p>}
-            {shop.error && (
-              <p className="text-xs text-muted-foreground">네이버 쇼핑검색 미연동 · 키 설정 후 표시</p>
-            )}
-            {shop.data && shop.data.items.length > 0 && (
-              <>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <Line label="상품 수" value={`${shop.data.total.toLocaleString("ko-KR")}개`} />
-                  <Line label="대표가(중앙)" value={won(shop.data.median)} />
-                  <Line label="가격대" value={`${won(shop.data.min)}~${won(shop.data.max)}`} />
-                </div>
-                {shop.data.median != null && (
-                  <Button asChild size="sm" variant="outline" className="mt-3 w-full">
-                    <Link href={`/calc?name=${encodeURIComponent(query)}&sale=${shop.data.median}`}>
-                      <Calculator className="h-4 w-4" /> 이 가격으로 마진계산
-                    </Link>
-                  </Button>
-                )}
-                <div className="mt-3 space-y-1">
-                  {shop.data.items.map((it, i) => (
-                    <a
-                      key={i}
-                      href={it.link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm hover:bg-accent"
-                    >
-                      <span className="truncate">{it.title}</span>
-                      <span className="shrink-0 text-muted-foreground">
-                        <b className="tabular-nums text-foreground">{won(it.price)}</b> · {it.mall}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </>
-            )}
-            {shop.data && shop.data.items.length === 0 && !shop.isLoading && !shop.error && (
-              <p className="text-xs text-muted-foreground">쇼핑 결과가 없어요.</p>
             )}
           </CardContent>
         </Card>
