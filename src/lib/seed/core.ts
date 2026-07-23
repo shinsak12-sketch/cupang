@@ -1,6 +1,7 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { PgTable } from "drizzle-orm/pg-core";
 import * as schema from "@/db/schema";
 import { SEED_CSV } from "./embedded";
 import { SOCKS_PROFILE } from "../../../seed/socks_profile";
@@ -70,10 +71,14 @@ export interface SeedReport {
  * 마스터 시딩 (CLI 스크립트 + /api/admin/setup 공유). 재실행 안전(idempotent).
  * fee_size_rule 은 의도적으로 비워둠 (윙 확인 필요).
  */
+async function isEmpty(db: DB, table: PgTable): Promise<boolean> {
+  const r = await db.select({ n: sql<number>`count(*)::int` }).from(table);
+  return Number(r[0]?.n ?? 0) === 0;
+}
+
 export async function seedAll(db: DB, log: (m: string) => void = () => {}): Promise<SeedReport> {
-  // fee_category
+  // fee_category — 이미 있으면 유지(상품 FK 참조 때문에 삭제 금지, idempotent)
   const cat = readCsv("fee_category");
-  await db.delete(schema.feeCategory);
   const catVals = cat.map((r) => ({
     major: r.major,
     middle: strOrNull(r.middle),
@@ -86,12 +91,15 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
     isVerified: false,
     source: strOrNull(r.source),
   }));
-  for (const c of chunked(catVals, 100)) await db.insert(schema.feeCategory).values(c);
-  log(`fee_category: ${catVals.length}`);
+  if (await isEmpty(db, schema.feeCategory)) {
+    for (const c of chunked(catVals, 100)) await db.insert(schema.feeCategory).values(c);
+    log(`fee_category: ${catVals.length}`);
+  } else {
+    log(`fee_category: 기존 유지(스킵)`);
+  }
 
   // fee_logistics
   const log_ = readCsv("fee_logistics");
-  await db.delete(schema.feeLogistics);
   const logVals = log_.map((r) => ({
     sizeType: r.size_type as (typeof schema.sizeTypeEnum.enumValues)[number],
     categoryGroup: null,
@@ -103,12 +111,15 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
     isVerified: false,
     source: strOrNull(r.source),
   }));
-  await db.insert(schema.feeLogistics).values(logVals);
-  log(`fee_logistics: ${logVals.length}`);
+  if (await isEmpty(db, schema.feeLogistics)) {
+    await db.insert(schema.feeLogistics).values(logVals);
+    log(`fee_logistics: ${logVals.length}`);
+  } else {
+    log(`fee_logistics: 기존 유지(스킵)`);
+  }
 
   // fee_misc
   const misc = readCsv("fee_misc");
-  await db.delete(schema.feeMisc);
   const miscVals = misc.map((r) => ({
     feeKey: r.fee_key,
     feeNameKo: r.fee_name_ko,
@@ -121,12 +132,15 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
     note: strOrNull(r.note),
     source: strOrNull(r.source),
   }));
-  await db.insert(schema.feeMisc).values(miscVals);
-  log(`fee_misc: ${miscVals.length}`);
+  if (await isEmpty(db, schema.feeMisc)) {
+    await db.insert(schema.feeMisc).values(miscVals);
+    log(`fee_misc: ${miscVals.length}`);
+  } else {
+    log(`fee_misc: 기존 유지(스킵)`);
+  }
 
   // promotion
   const promo = readCsv("promotion");
-  await db.delete(schema.promotion);
   const promoVals = promo.map((r) => {
     let waives: string[] = [];
     if (r.waives && r.waives.trim() !== "") {
@@ -150,12 +164,15 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
       source: strOrNull(r.source),
     };
   });
-  await db.insert(schema.promotion).values(promoVals);
-  log(`promotion: ${promoVals.length}`);
+  if (await isEmpty(db, schema.promotion)) {
+    await db.insert(schema.promotion).values(promoVals);
+    log(`promotion: ${promoVals.length}`);
+  } else {
+    log(`promotion: 기존 유지(스킵)`);
+  }
 
   // assumption (_DEFAULT/카테고리)
   const asm = readCsv("assumption_default");
-  await db.delete(schema.assumption);
   const asmVals = asm.map((r) => ({
     productId: null,
     categoryMajor: r.category_major === "_DEFAULT" ? null : r.category_major,
@@ -168,8 +185,12 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
     isEstimate: true,
     dataSource: strOrNull(r.basis),
   }));
-  await db.insert(schema.assumption).values(asmVals);
-  log(`assumption: ${asmVals.length}`);
+  if (await isEmpty(db, schema.assumption)) {
+    await db.insert(schema.assumption).values(asmVals);
+    log(`assumption: ${asmVals.length}`);
+  } else {
+    log(`assumption: 기존 유지(스킵)`);
+  }
 
   // 양말 프로파일 (HS + 데모 상품 + 상품별 가정)
   const socks = await seedSocks(db);
@@ -186,6 +207,12 @@ export async function seedAll(db: DB, log: (m: string) => void = () => {}): Prom
 }
 
 async function seedSocks(db: DB): Promise<string> {
+  // 데모 상품이 이미 있으면 아무것도 건드리지 않음(hsCode FK 삭제 충돌 방지)
+  const existing = await db.query.product.findFirst({
+    where: (t, { eq: e }) => e(t.name, "양말 (데모 프로파일)"),
+  });
+  if (existing) return "이미 존재 → 스킵";
+
   const c = SOCKS_PROFILE.customs;
   await db.delete(schema.hsCode).where(eq(schema.hsCode.hsCode, c.hsCode));
   const [hs] = await db
@@ -205,10 +232,6 @@ async function seedSocks(db: DB): Promise<string> {
     where: (t, { and, eq: e }) =>
       and(e(t.major, SOCKS_PROFILE.category.major), e(t.middle, SOCKS_PROFILE.category.middle)),
   });
-  const existing = await db.query.product.findFirst({
-    where: (t, { eq: e }) => e(t.name, "양말 (데모 프로파일)"),
-  });
-  if (existing) return "이미 존재 → 스킵";
 
   const p = SOCKS_PROFILE.size.typicalPackage;
   const [socks] = await db
