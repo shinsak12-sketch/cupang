@@ -290,6 +290,8 @@ export default function CalcPage() {
   };
   const revPrice = landedCost > 0 && n(revTargetRate) > 0 ? bisectPrice(n(revTargetRate)) : null;
   const revMaxLanded = n(revCompPrice) > 0 && n(revTargetRate2) > 0 ? bisectLanded(n(revCompPrice), n(revTargetRate2)) : null;
+  // 손익분기 판매가 (실마진 0이 되는 가격)
+  const breakevenPrice = landedCost > 0 ? bisectPrice(0) : null;
 
   async function save() {
     if (!name) {
@@ -592,6 +594,25 @@ export default function CalcPage() {
           <Field label="판매가 (소비자 결제가)">
             <Input value={salePrice} onChange={(e) => setSalePrice(e.target.value)} inputMode="numeric" placeholder="0" />
           </Field>
+          {breakevenPrice != null && (
+            <div>
+              <input
+                type="range"
+                min={breakevenPrice}
+                max={Math.max(breakevenPrice * 3, n(salePrice) || 0)}
+                step={100}
+                value={Math.min(Math.max(n(salePrice) || breakevenPrice, breakevenPrice), Math.max(breakevenPrice * 3, n(salePrice) || 0))}
+                onChange={(e) => setSalePrice(e.target.value)}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">손익분기 {won(breakevenPrice)}</span>
+                <span className={result.marginAfterReturn < 0 ? "font-semibold text-red-600" : "font-semibold text-emerald-600"}>
+                  실마진 {won(result.marginAfterReturn)} ({pct(result.marginRateAfterReturn)})
+                </span>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="판매수수료 %">
               <Input value={commission} onChange={(e) => setCommission(e.target.value)} inputMode="decimal" />
