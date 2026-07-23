@@ -28,28 +28,43 @@ export function insightConfigured(): boolean {
   return !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
 }
 
-function direction(series: number[]): Trend {
-  if (series.length < 4) return { direction: "flat", changePct: null, series };
-  const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
-  const first = avg(series.slice(0, 3));
-  const last = avg(series.slice(-3));
-  const changePct = first > 0 ? Math.round(((last - first) / first) * 100) : null;
-  const dir: Trend["direction"] =
-    changePct == null ? "flat" : changePct >= 15 ? "up" : changePct <= -15 ? "down" : "flat";
-  return { direction: dir, changePct, series };
+const avg = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
+
+/** 최근 n개월 평균 vs 작년 같은 n개월 평균(계절 상쇄, YoY). series는 완료월 24개. */
+function yoy(series: number[], n: number): Pt {
+  if (series.length < n + 12) return { direction: "flat", changePct: null };
+  const recent = series.slice(series.length - n);
+  const prior = series.slice(series.length - n - 12, series.length - 12);
+  const a = avg(recent);
+  const b = avg(prior);
+  if (b <= 0) return { direction: "flat", changePct: null };
+  const changePct = Math.round(((a - b) / b) * 100);
+  const direction: Trend["direction"] = changePct >= 10 ? "up" : changePct <= -10 ? "down" : "flat";
+  return { direction, changePct };
 }
 
-/** 대분류 전체 추이 (요청당 최대 3개 → 배치 병렬). months: 3|6|12 */
-export async function allCategoryTrends(months = 12): Promise<CategoryTrend[]> {
+export type Pt = { direction: Trend["direction"]; changePct: number | null };
+export type CategoryMulti = {
+  name: string;
+  cid: string;
+  p3: Pt; // 최근 3개월 전년비
+  p6: Pt;
+  p12: Pt;
+  series: number[]; // 최근 12개월 (스파크라인용)
+};
+
+/**
+ * 대분류별 전년 동기 대비(YoY) 증감을 한 번에.
+ * 완료된 달 기준 24개월 월간 데이터 → 3/6/12개월 각각 작년 같은 기간과 비교(계절 상쇄).
+ */
+export async function allCategoryTrendsMulti(): Promise<CategoryMulti[]> {
   const id = process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return [];
 
-  const timeUnit = months >= 12 ? "month" : "week"; // 짧으면 주간(점 촘촘)
-  const end = new Date();
-  const start = new Date(end);
-  start.setMonth(start.getMonth() - months);
-  if (timeUnit === "month") start.setDate(1);
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), 0); // 지난달 말일(이번 달 미완성 제외)
+  const start = new Date(end.getFullYear(), end.getMonth() - 23, 1); // 24개월 전 1일
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
   const batches: { name: string; cid: string }[][] = [];
@@ -66,7 +81,7 @@ export async function allCategoryTrends(months = 12): Promise<CategoryTrend[]> {
       body: JSON.stringify({
         startDate: fmt(start),
         endDate: fmt(end),
-        timeUnit,
+        timeUnit: "month",
         category: batch.map((c) => ({ name: c.name, param: [c.cid] })),
       }),
     });
@@ -78,54 +93,24 @@ export async function allCategoryTrends(months = 12): Promise<CategoryTrend[]> {
     return (j.results ?? []).map((res, idx) => {
       const cat = batch[idx];
       const series = (res.data ?? []).map((d) => d.ratio);
-      return { name: cat.name, cid: cat.cid, ...direction(series) };
+      return {
+        name: cat.name,
+        cid: cat.cid,
+        p3: yoy(series, 3),
+        p6: yoy(series, 6),
+        p12: yoy(series, 12),
+        series: series.slice(-12),
+      } as CategoryMulti;
     });
   });
 
   const settled = await Promise.allSettled(reqs);
-  const ok = settled.filter((s) => s.status === "fulfilled").flatMap((s) => (s as PromiseFulfilledResult<CategoryTrend[]>).value);
+  const ok = settled
+    .filter((s) => s.status === "fulfilled")
+    .flatMap((s) => (s as PromiseFulfilledResult<CategoryMulti[]>).value);
   if (ok.length === 0) {
     const firstErr = settled.find((s) => s.status === "rejected") as PromiseRejectedResult | undefined;
     if (firstErr) throw firstErr.reason;
   }
   return ok;
-}
-
-export type Pt = { direction: Trend["direction"]; changePct: number | null };
-export type CategoryMulti = {
-  name: string;
-  cid: string;
-  p3: Pt;
-  p6: Pt;
-  p12: Pt;
-  series: number[]; // 12개월 스파크라인용
-};
-
-/** 대분류별 3·6·12개월 추이를 한 번에. */
-export async function allCategoryTrendsMulti(): Promise<CategoryMulti[]> {
-  const [r3, r6, r12] = await Promise.allSettled([
-    allCategoryTrends(3),
-    allCategoryTrends(6),
-    allCategoryTrends(12),
-  ]);
-  const val = (r: PromiseSettledResult<CategoryTrend[]>) =>
-    r.status === "fulfilled" ? r.value : [];
-  if (val(r3).length === 0 && val(r6).length === 0 && val(r12).length === 0) {
-    const err = [r3, r6, r12].find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
-    if (err) throw err.reason;
-  }
-  const by = (arr: CategoryTrend[]) => new Map(arr.map((x) => [x.cid, x]));
-  const m3 = by(val(r3));
-  const m6 = by(val(r6));
-  const m12 = by(val(r12));
-  const pt = (t?: CategoryTrend): Pt => (t ? { direction: t.direction, changePct: t.changePct } : { direction: "flat", changePct: null });
-
-  return NAVER_CATEGORIES.map((c) => ({
-    name: c.name,
-    cid: c.cid,
-    p3: pt(m3.get(c.cid)),
-    p6: pt(m6.get(c.cid)),
-    p12: pt(m12.get(c.cid)),
-    series: m12.get(c.cid)?.series ?? [],
-  }));
 }
