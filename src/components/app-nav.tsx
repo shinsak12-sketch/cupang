@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Calculator, Package, ClipboardList, LayoutGrid } from "lucide-react";
+import { Home, Search, Calculator, Package, ClipboardList, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY = [
@@ -11,12 +11,10 @@ const PRIMARY = [
   { href: "/", label: "홈", icon: Home },
   { href: "/products", label: "목록", icon: Package },
   { href: "/manage", label: "관리", icon: ClipboardList },
-  { href: "/more", label: "더보기", icon: LayoutGrid },
 ];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  if (href === "/more") return pathname.startsWith("/settings") || pathname === "/more" || pathname === "/compare" || pathname === "/cashflow";
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -49,6 +47,20 @@ export function TopBar() {
             </Link>
           ))}
         </nav>
+
+        {/* 설정(기어) — 우측 상단 */}
+        <Link
+          href="/more"
+          aria-label="설정"
+          className={cn(
+            "ml-auto grid h-9 w-9 place-items-center rounded-full transition-colors",
+            pathname === "/more" || pathname.startsWith("/settings")
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          )}
+        >
+          <Settings className="h-5 w-5" />
+        </Link>
       </div>
     </header>
   );
@@ -59,7 +71,7 @@ export function BottomNav() {
   if (pathname === "/login") return null;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-lg md:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-6 px-1 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto grid max-w-md grid-cols-5 px-1 pb-[env(safe-area-inset-bottom)]">
         {PRIMARY.map((n) => {
           const active = isActive(pathname, n.href);
           const Icon = n.icon;

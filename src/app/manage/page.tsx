@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { won } from "@/lib/utils";
+import { MonthlyGoal } from "@/components/monthly-goal";
 
 type Product = {
   id: number;
@@ -47,6 +48,8 @@ export default function ManagePage() {
         <h1 className="text-2xl font-extrabold tracking-tight">상품 관리</h1>
         <p className="text-sm text-muted-foreground">판매중 상품의 월별 판매수량을 입력해 실적을 쌓아요.</p>
       </div>
+
+      <MonthlyGoal />
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
